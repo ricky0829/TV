@@ -163,11 +163,16 @@ public class CollectActivity extends BaseActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (KeyUtil.isActionDown(event) && KeyUtil.isRightKey(event)) {
-            View focused = getCurrentFocus();
-            if (mBinding.sites.hasFocus() || (focused != null && mBinding.sites.findContainingItemView(focused) != null)) {
+        if (KeyUtil.isActionDown(event)) {
+            if (KeyUtil.isRightKey(event)) {
+                View focused = getCurrentFocus();
+                if (mBinding.sites.hasFocus() || (focused != null && mBinding.sites.findContainingItemView(focused) != null)) {
+                    CollectFragment fragment = getCurrentFragment();
+                    if (fragment != null && fragment.requestContentFocus()) return true;
+                }
+            } else if (KeyUtil.isLeftKey(event)) {
                 CollectFragment fragment = getCurrentFragment();
-                if (fragment != null && fragment.requestContentFocus()) return true;
+                if (fragment != null && fragment.moveFocusToSites()) return true;
             }
         }
         return super.dispatchKeyEvent(event);

@@ -2,7 +2,6 @@ package com.fongmi.android.tv.ui.fragment;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -84,10 +83,6 @@ public class CollectFragment extends BaseFragment implements CustomScroller.Call
         mBinding.recycler.addOnScrollListener(mScroller = new CustomScroller(this));
         mBinding.recycler.setHeader(getActivity(), R.id.result);
         mBinding.recycler.setVerticalSpacing(ResUtil.dp2px(16));
-        mBinding.recycler.setOnKeyListener((view, keyCode, event) -> {
-            if (event.getAction() != KeyEvent.ACTION_DOWN || keyCode != KeyEvent.KEYCODE_DPAD_LEFT) return false;
-            return moveFocusToSites();
-        });
     }
 
     public boolean requestContentFocus() {
@@ -96,7 +91,7 @@ public class CollectFragment extends BaseFragment implements CustomScroller.Call
         return true;
     }
 
-    private boolean moveFocusToSites() {
+    public boolean moveFocusToSites() {
         View focused = mBinding.recycler.findFocus();
         if (focused == null) return false;
         ViewParent parent = focused.getParent();
