@@ -14,8 +14,6 @@ import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.button.MaterialButton;
 
-import java.util.concurrent.CancellationException;
-
 final class MpvMotionSettingPanel {
 
     private static final int[] FRAME_RATES = {0, 60, 120};
@@ -23,7 +21,6 @@ final class MpvMotionSettingPanel {
     private final ViewMpvMotionBinding binding;
     @Nullable
     private final MpvPlayer player;
-    private final Runnable motionListener = this::updateMotion;
     private boolean released;
 
     MpvMotionSettingPanel(ViewMpvMotionBinding binding, @Nullable Player player) {
@@ -37,14 +34,12 @@ final class MpvMotionSettingPanel {
         String[] labels = ResUtil.getStringArray(R.array.select_mpv_motion);
         MaterialButton[] modes = getModes();
         for (int i = 0; i < modes.length; i++) bindMode(modes[i], labels[i], i);
-        MpvMotionSupport.addListener(player, motionListener);
         updateMotion();
     }
 
     void release() {
         released = true;
         for (MaterialButton mode : getModes()) mode.setOnClickListener(null);
-        if (player != null) MpvMotionSupport.removeListener(player, motionListener);
     }
 
     private void bindMode(MaterialButton button, String label, int index) {
@@ -54,37 +49,22 @@ final class MpvMotionSettingPanel {
     }
 
     private void selectMode(int index) {
-        if (player == null || !MpvMotionSupport.isSupported(player) || MpvMotionSupport.isUpdatePending(player)) return;
-        MpvMotionSupport.setFps(player, FRAME_RATES[index], new MpvMotionSupport.Callback() {
-            @Override
-            public void onSuccess() {
-                onApplied(index);
-            }
-
-            @Override
-            public void onFailure(Throwable error) {
-                onFailed(error);
-            }
-        });
-    }
-
-    private void onApplied(int index) {
+        if (player == null || !MpvMotionSupport.isSupported(player)) return;
+        if (!MpvMotionSupport.setFps(player, FRAME_RATES[index])) {
+            Notify.show(ResUtil.getString(R.string.player_mpv_motion_unavailable));
+            return;
+        }
         PlayerSetting.putMpvMotion(index);
-        updateMotion();
-    }
-
-    private void onFailed(Throwable error) {
-        if (!(error instanceof CancellationException)) Notify.show(Notify.getError(R.string.player_mpv_motion_failed, error));
         updateMotion();
     }
 
     private void updateMotion() {
         if (released || player == null) return;
-        int fps = MpvMotionSupport.getFps(player);
+        int fps = MpvMotionSupport.getFps();
         boolean supported = MpvMotionSupport.isSupported(player);
         SettingPanelViews.applyEnabled(binding.modes, supported);
         if (supported) updateChecked(fps);
-        binding.status.setText(getStatusText(supported, MpvMotionSupport.isUpdatePending(player), fps, MpvMotionSupport.getEffectiveFps(player)));
+        binding.status.setText(getStatusText(supported, fps, MpvMotionSupport.getEffectiveFps()));
     }
 
     private void updateChecked(int fps) {
@@ -95,9 +75,8 @@ final class MpvMotionSettingPanel {
         else binding.modes.check(checked);
     }
 
-    private String getStatusText(boolean supported, boolean pending, int fps, float effective) {
+    private String getStatusText(boolean supported, int fps, float effective) {
         if (!supported) return ResUtil.getString(R.string.player_mpv_motion_unavailable);
-        if (pending) return ResUtil.getString(R.string.player_mpv_motion_applying);
         if (effective > 0 && effective < fps - 0.001f) return ResUtil.getString(R.string.player_mpv_motion_capped, effective);
         return fps == 0 ? ResUtil.getString(R.string.setting_off) : ResUtil.getString(R.string.player_mpv_motion_target, fps);
     }

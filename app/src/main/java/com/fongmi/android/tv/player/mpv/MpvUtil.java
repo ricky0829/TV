@@ -47,7 +47,7 @@ public final class MpvUtil {
     private static final List<String> FONT_OPTIONS = List.of("sub-font", "sub-fonts-dir", "sub-ass-style-overrides");
     private static final List<String> SCALE_OPTIONS = List.of("sub-scale", "sub-scale-signs", "secondary-sub-scale");
     private static final List<String> CACHE_OPTIONS = List.of("cache", "cache-on-disk", "demuxer-cache-dir", "cache-secs");
-    private static final List<String> MOTION_OPTIONS = List.of("motion-interpolation", "video-sync", "display-fps-override");
+    private static final List<String> MOTION_OPTIONS = List.of("interpolation", "video-sync", "tscale");
     private static final List<String> PLAYER_OPTIONS = List.of("vo", "gpu-api", "gpu-context", "force-window", "audio-spdif", "android-dolby-vision-output", "demuxer-dovi-profile7");
     private static final List<String> STYLE_OPTIONS = List.of("sub-color", "sub-back-color", "sub-border-style", "sub-outline-color", "sub-outline-size", "sub-shadow-offset");
     private static final List<String> IMAGE_SUBTITLE_OPTIONS = List.of("image-subs-brightness", "image-subs-override", "image-subs-color");
@@ -103,6 +103,7 @@ public final class MpvUtil {
         MpvPlayer player = new MpvPlayer.Builder(App.get()).setVideoDecoderMode(mode).setConfig(buildConfig()).build();
         player.setSubtitleContentLoader(new SubtitleFileContent());
         setPreferredTextLanguages(player);
+        MpvMotionSupport.applyDisplayMode();
         player.addListener(listener);
         return player;
     }
@@ -143,7 +144,14 @@ public final class MpvUtil {
         builder.addPreInitStringOption("proxy-url", "http://127.0.0.1:" + Proxy.getPort() + "/proxy?");
         builder.addTlsCaFileFromAsset(App.get(), ASSET_CA_FILE, Path.files(ASSET_CA_FILE)).addAndroidSubtitleOptions(App.get(), buildSubtitleOptions(font));
         if (PreloadSetting.isEnabled()) builder.addDiskCacheOptions(cacheDir, PreloadSetting.getTimeSeconds());
+        if (isMotionEnabled()) addMotionOptions(builder);
         return builder.build();
+    }
+
+    static void addMotionOptions(MpvPlayerConfig.Builder builder) {
+        builder.addPreInitStringOption("interpolation", "yes");
+        builder.addPreInitStringOption("video-sync", "display-resample");
+        builder.addPreInitStringOption("tscale", "oversample");
     }
 
     public static List<MpvScripts.Item> readScripts() {
