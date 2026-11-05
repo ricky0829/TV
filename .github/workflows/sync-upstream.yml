@@ -87,7 +87,7 @@ jobs:
             echo "git push origin fongmi"
             echo '```'
             echo
-            echo "处理要点见项目 skill \`fongmi-tv-upstream-sync\`：分辨率/选集/多排选集/竖排站点改动、运动补偿兼容层、预编译 AAR 版本。"
+            echo "处理要点见 [.trae/skills/fongmi-tv-upstream-sync/SKILL.md](https://github.com/${GITHUB_REPOSITORY}/blob/fongmi/.trae/skills/fongmi-tv-upstream-sync/SKILL.md)：分辨率/选集/多排选集/竖排站点改动、运动补偿兼容层、预编译 AAR 版本。"
           } > /tmp/issue.md
           gh issue create --title "上游同步冲突：需要手动合并 FongMi/TV" --body-file /tmp/issue.md
           echo "::warning::merge conflict, see the created issue"
