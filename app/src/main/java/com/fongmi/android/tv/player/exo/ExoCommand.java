@@ -5,7 +5,6 @@ import androidx.media3.common.MediaChapter;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoTransform;
 import androidx.media3.common.text.SubtitleOffsets;
-import androidx.media3.common.util.TrackSelectionUtil;
 import androidx.media3.ui.PlayerView;
 
 import com.fongmi.android.tv.player.PlayerManager;
@@ -100,14 +99,14 @@ public final class ExoCommand {
     private static Result executeAudioTrack(Player player, Parsed parsed) {
         boolean applied;
         if (parsed.mode.equals("cycle")) {
-            applied = TrackSelectionUtil.cycleTrack(player, C.TRACK_TYPE_AUDIO, !parsed.reverse, true);
+            applied = ExoAudioTracks.cycle(player, C.TRACK_TYPE_AUDIO, !parsed.reverse, true);
         } else if (parsed.mode.equals("cycle-values")) {
-            applied = TrackSelectionUtil.cycleTrack(player, C.TRACK_TYPE_AUDIO, parsed.trackIds, !parsed.reverse, false);
+            applied = ExoAudioTracks.cycle(player, C.TRACK_TYPE_AUDIO, parsed.trackIds, !parsed.reverse, false);
         } else {
             applied = switch (parsed.trackIds.get(0)) {
-                case "no" -> TrackSelectionUtil.setTrackTypeDisabled(player, C.TRACK_TYPE_AUDIO, true);
-                case "auto" -> TrackSelectionUtil.resetTrackSelection(player, C.TRACK_TYPE_AUDIO);
-                default -> TrackSelectionUtil.selectTrack(player, C.TRACK_TYPE_AUDIO, parsed.trackIds.get(0));
+                case "no" -> ExoAudioTracks.disable(player, C.TRACK_TYPE_AUDIO);
+                case "auto" -> ExoAudioTracks.reset(player, C.TRACK_TYPE_AUDIO);
+                default -> ExoAudioTracks.select(player, C.TRACK_TYPE_AUDIO, parsed.trackIds.get(0));
             };
         }
         return applied ? Result.APPLIED : Result.UNAVAILABLE;
