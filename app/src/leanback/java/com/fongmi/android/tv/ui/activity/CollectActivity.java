@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -29,6 +30,7 @@ import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.adapter.CollectAdapter;
 import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.fragment.CollectFragment;
+import com.fongmi.android.tv.utils.KeyUtil;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.gson.reflect.TypeToken;
 
@@ -51,6 +53,11 @@ public class CollectActivity extends BaseActivity {
 
     private CollectFragment getFragment() {
         return (CollectFragment) mBinding.pager.getAdapter().instantiateItem(mBinding.pager, 0);
+    }
+
+    private CollectFragment getCurrentFragment() {
+        if (mBinding.pager.getAdapter() == null) return null;
+        return (CollectFragment) mBinding.pager.getAdapter().instantiateItem(mBinding.pager, mBinding.pager.getCurrentItem());
     }
 
     private String getKeyword() {
@@ -86,11 +93,11 @@ public class CollectActivity extends BaseActivity {
         mBinding.pager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override
             public void onPageSelected(int position) {
-                mBinding.recycler.setSelectedPosition(position);
-                mBinding.recycler.requestFocus();
+                mBinding.sites.setSelectedPosition(position);
+                mBinding.sites.requestFocus();
             }
         });
-        mBinding.recycler.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
+        mBinding.sites.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
             @Override
             public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
                 onChildSelected(child);
@@ -99,9 +106,9 @@ public class CollectActivity extends BaseActivity {
     }
 
     private void setRecyclerView() {
-        mBinding.recycler.setHorizontalSpacing(ResUtil.dp2px(16));
-        mBinding.recycler.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
-        mBinding.recycler.setAdapter(mAdapter = new CollectAdapter());
+        mBinding.sites.setVerticalSpacing(ResUtil.dp2px(8));
+        mBinding.sites.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        mBinding.sites.setAdapter(mAdapter = new CollectAdapter());
     }
 
     private void setViewModel() {
@@ -135,6 +142,9 @@ public class CollectActivity extends BaseActivity {
         mAdapter.add(Collect.all());
         mBinding.pager.getAdapter().notifyDataSetChanged();
         mBinding.result.setText(getString(R.string.collect_result, getKeyword()));
+        mBinding.sites.post(() -> {
+            if (getCurrentFocus() == null) mBinding.sites.requestFocus();
+        });
         mViewModel.searchContent(mSites, getKeyword(), false);
     }
 
@@ -148,9 +158,21 @@ public class CollectActivity extends BaseActivity {
     private final Runnable mRunnable = new Runnable() {
         @Override
         public void run() {
-            mBinding.pager.setCurrentItem(mBinding.recycler.getSelectedPosition());
+            mBinding.pager.setCurrentItem(mBinding.sites.getSelectedPosition());
         }
     };
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (KeyUtil.isActionDown(event) && KeyUtil.isRightKey(event)) {
+            View focused = getCurrentFocus();
+            if (mBinding.sites.hasFocus() || (focused != null && mBinding.sites.findContainingItemView(focused) != null)) {
+                CollectFragment fragment = getCurrentFragment();
+                if (fragment != null && fragment.requestContentFocus()) return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
 
     @Override
     protected void onBackInvoked() {

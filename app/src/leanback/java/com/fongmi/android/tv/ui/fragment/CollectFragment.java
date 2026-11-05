@@ -2,8 +2,11 @@ package com.fongmi.android.tv.ui.fragment;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -11,6 +14,7 @@ import androidx.leanback.widget.ArrayObjectAdapter;
 import androidx.leanback.widget.ItemBridgeAdapter;
 import androidx.leanback.widget.ListRow;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.Product;
@@ -78,8 +82,31 @@ public class CollectFragment extends BaseFragment implements CustomScroller.Call
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16), VodPresenter.class);
         mBinding.recycler.setAdapter(new ItemBridgeAdapter(mAdapter = new ArrayObjectAdapter(selector)));
         mBinding.recycler.addOnScrollListener(mScroller = new CustomScroller(this));
-        mBinding.recycler.setHeader(getActivity(), R.id.result, R.id.recycler);
+        mBinding.recycler.setHeader(getActivity(), R.id.result);
         mBinding.recycler.setVerticalSpacing(ResUtil.dp2px(16));
+        mBinding.recycler.setOnKeyListener((view, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN || keyCode != KeyEvent.KEYCODE_DPAD_LEFT) return false;
+            return moveFocusToSites();
+        });
+    }
+
+    public boolean requestContentFocus() {
+        if (mBinding == null || mBinding.recycler.getAdapter() == null || mBinding.recycler.getAdapter().getItemCount() == 0) return false;
+        mBinding.recycler.requestFocus();
+        return true;
+    }
+
+    private boolean moveFocusToSites() {
+        View focused = mBinding.recycler.findFocus();
+        if (focused == null) return false;
+        ViewParent parent = focused.getParent();
+        while (parent != null && !(parent instanceof RecyclerView)) parent = parent.getParent();
+        if (!(parent instanceof RecyclerView row) || row == mBinding.recycler) return false;
+        View child = focused;
+        while (child.getParent() != null && child.getParent() != row) child = (View) child.getParent();
+        if (row.getChildAdapterPosition(child) != 0) return false;
+        View sites = requireActivity().findViewById(R.id.sites);
+        return sites != null && sites.requestFocus();
     }
 
     private void setViewModel() {

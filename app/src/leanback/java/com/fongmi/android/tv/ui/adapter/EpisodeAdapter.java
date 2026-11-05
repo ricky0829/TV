@@ -1,14 +1,17 @@
 package com.fongmi.android.tv.ui.adapter;
 
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.bean.Episode;
 import com.fongmi.android.tv.databinding.AdapterEpisodeBinding;
 import com.fongmi.android.tv.utils.ResUtil;
+import com.google.android.material.textview.MaterialTextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +21,7 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     private final OnClickListener mListener;
     private final List<Episode> mItems;
     private final int maxWidth;
+    private int spanCount;
     private int nextFocusDown;
     private int nextFocusUp;
 
@@ -25,6 +29,11 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
         mListener = listener;
         mItems = new ArrayList<>();
         maxWidth = ResUtil.getScreenWidth() - ResUtil.dp2px(48);
+    }
+
+    public EpisodeAdapter grid(int spanCount) {
+        this.spanCount = spanCount;
+        return this;
     }
 
     public void addAll(List<Episode> items) {
@@ -36,6 +45,10 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     public void clear() {
         mItems.clear();
         notifyDataSetChanged();
+    }
+
+    public List<Episode> getItems() {
+        return new ArrayList<>(mItems);
     }
 
     public int getPosition() {
@@ -78,32 +91,39 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new ViewHolder(AdapterEpisodeBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+        if (spanCount > 0) return new ViewHolder((MaterialTextView) LayoutInflater.from(parent.getContext()).inflate(R.layout.adapter_episode_grid, parent, false));
+        return new ViewHolder(AdapterEpisodeBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false).getRoot());
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Episode item = mItems.get(position);
-        holder.binding.text.setMaxWidth(maxWidth);
-        holder.binding.text.setNextFocusUpId(nextFocusUp);
-        holder.binding.text.setNextFocusDownId(nextFocusDown);
-        holder.binding.text.setSelected(item.isSelected());
-        holder.binding.text.setText(item.getDesc().concat(item.getName()));
-        holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(item));
+        holder.text.setMaxWidth(maxWidth);
+        holder.text.setNextFocusUpId(spanCount > 0 && position >= spanCount ? View.NO_ID : nextFocusUp);
+        holder.text.setNextFocusDownId(spanCount > 0 && position + spanCount < mItems.size() ? View.NO_ID : nextFocusDown);
+        holder.text.setSelected(item.isSelected());
+        holder.text.setText(item.getDesc().concat(item.getName()));
+        holder.text.setOnClickListener(v -> mListener.onItemClick(item));
+        holder.text.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) mListener.onItemFocus(item, v);
+        });
     }
 
     public interface OnClickListener {
 
         void onItemClick(Episode item);
+
+        default void onItemFocus(Episode item, View view) {
+        }
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
 
-        private final AdapterEpisodeBinding binding;
+        private final MaterialTextView text;
 
-        ViewHolder(@NonNull AdapterEpisodeBinding binding) {
-            super(binding.getRoot());
-            this.binding = binding;
+        ViewHolder(@NonNull MaterialTextView text) {
+            super(text);
+            this.text = text;
         }
     }
 }

@@ -20,4 +20,7 @@
     <string name="dialog_action_grid">切換為網格</string>
     <string name="dialog_action_list">切換為列表</string>
 
+    <!-- Playback -->
+    <string name="detail_episode">選集</string>
+
 </resources>

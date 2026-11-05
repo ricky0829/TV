@@ -1,5 +1,6 @@
 package com.fongmi.android.tv.ui.adapter;
 
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -8,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.fongmi.android.tv.bean.Collect;
 import com.fongmi.android.tv.databinding.AdapterTypeBinding;
+import com.fongmi.android.tv.utils.ResUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +50,14 @@ public class CollectAdapter extends RecyclerView.Adapter<CollectAdapter.ViewHold
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Collect item = mItems.get(position);
+        ViewGroup.LayoutParams params = holder.binding.getRoot().getLayoutParams();
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = ResUtil.dp2px(44);
+            holder.binding.getRoot().setLayoutParams(params);
+        }
         holder.binding.getRoot().setOnClickListener(null);
+        holder.binding.text.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         holder.binding.text.setText(item.getSite().getName());
     }
 

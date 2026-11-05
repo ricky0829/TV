@@ -1,0 +1,99 @@
+name: Build Leanback APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      mpv_aar_url:
+        description: "lib-mpvplayer-release.aar download URL (optional, fallback to MPV_AAR_URL)"
+        required: false
+      ffmpeg_aar_url:
+        description: "lib-decoder-ffmpeg-release.aar download URL (optional, fallback to FFMPEG_AAR_URL)"
+        required: false
+  push:
+    branches: [fongmi]
+    paths:
+      - "app/**"
+      - ".github/workflows/build-tv.yml"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle.properties"
+      - "gradle/**"
+      - "buildSrc/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-tv-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK platform
+        run: sdkmanager --install "platforms;android-37" "platform-tools"
+
+      - name: Fetch private AARs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MPV_URL: ${{ github.event.inputs.mpv_aar_url || vars.MPV_AAR_URL }}
+          FFMPEG_URL: ${{ github.event.inputs.ffmpeg_aar_url || vars.FFMPEG_AAR_URL }}
+        run: |
+          mkdir -p app/libs
+          if [ ! -f app/libs/lib-mpvplayer-release.aar ]; then
+            gh release download aar --pattern lib-mpvplayer-release.aar --dir /tmp --clobber || true
+            if [ -f /tmp/lib-mpvplayer-release.aar ]; then mv /tmp/lib-mpvplayer-release.aar app/libs/lib-mpvplayer-release.aar; fi
+          fi
+          if [ ! -f app/libs/lib-decoder-ffmpeg-release.aar ]; then
+            gh release download aar --pattern lib-decoder-ffmpeg-release.aar --dir /tmp --clobber || true
+            if [ -f /tmp/lib-decoder-ffmpeg-release.aar ]; then mv /tmp/lib-decoder-ffmpeg-release.aar app/libs/lib-decoder-ffmpeg-release.aar; fi
+          fi
+          if [ ! -f app/libs/lib-mpvplayer-release.aar ] && [ -n "$MPV_URL" ]; then
+            curl -fL "$MPV_URL" -o app/libs/lib-mpvplayer-release.aar
+          fi
+          if [ ! -f app/libs/lib-decoder-ffmpeg-release.aar ] && [ -n "$FFMPEG_URL" ]; then
+            curl -fL "$FFMPEG_URL" -o app/libs/lib-decoder-ffmpeg-release.aar
+          fi
+          ls -l app/libs
+          if [ ! -f app/libs/lib-mpvplayer-release.aar ]; then
+            echo "::error::Missing app/libs/lib-mpvplayer-release.aar. Upload it to a Release tagged 'aar' or set the MPV_AAR_URL repository variable."
+            exit 1
+          fi
+          if [ ! -f app/libs/lib-decoder-ffmpeg-release.aar ]; then
+            echo "::error::Missing app/libs/lib-decoder-ffmpeg-release.aar. Upload it to a Release tagged 'aar' or set the FFMPEG_AAR_URL repository variable."
+            exit 1
+          fi
+
+      - name: Prepare signing config
+        run: |
+          keytool -genkeypair -v -keystore app/keystore.jks -alias tv -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=FongMi TV Build, OU=Dev, O=FongMi, L=NA, ST=NA, C=CN"
+          cat > local.properties <<EOF
+          sdk.dir=$ANDROID_HOME
+          storeFile=keystore.jks
+          keyAlias=tv
+          storePassword=android
+          keyPassword=android
+          EOF
+
+      - name: Build leanback release
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleLeanbackRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fongmi-leanback-release
+          path: app/build/outputs/apk/leanback/release/*.apk
+          if-no-files-found: error
