@@ -46,7 +46,7 @@ jobs:
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort | tail -n 1)
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" --install "platforms;android-37" "platform-tools"
+          "$SDKMANAGER" --install --channel=3 "platforms;android-37" "platform-tools"
 
       - name: Fetch private AARs
         env:
