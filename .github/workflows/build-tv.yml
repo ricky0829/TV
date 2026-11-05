@@ -2,13 +2,6 @@ name: Build Leanback APK
 
 on:
   workflow_dispatch:
-    inputs:
-      mpv_aar_url:
-        description: "lib-mpvplayer-release.aar download URL (optional, fallback to MPV_AAR_URL)"
-        required: false
-      ffmpeg_aar_url:
-        description: "lib-decoder-ffmpeg-release.aar download URL (optional, fallback to FFMPEG_AAR_URL)"
-        required: false
   push:
     branches: [fongmi]
     paths:
@@ -42,42 +35,31 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Install Android SDK platform
+      - name: Setup Android SDK
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort | tail -n 1)
-          yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" --install --channel=3 "platforms;android-37" "platform-tools"
+          echo "sdkmanager: $SDKMANAGER"
+          echo "--- preinstalled platforms ---"
+          ls "$ANDROID_HOME/platforms" || true
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
+            "$SDKMANAGER" --install --channel=3 "platforms;android-37" "build-tools;37.0.0" "platform-tools" || true
+          fi
+          if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
+            echo "::warning::android-37 is unavailable on this runner, falling back to android-36"
+            "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+            sed -i 's/^compileSdk = "37"/compileSdk = "36"/; s/^targetSdk = "37"/targetSdk = "36"/; s/^buildTools = "37.0.0"/buildTools = "36.0.0"/' gradle/libs.versions.toml
+          fi
+          echo "--- effective versions ---"
+          head -n 8 gradle/libs.versions.toml
 
-      - name: Fetch private AARs
+      - name: Fetch prebuilt AARs
         env:
           GH_TOKEN: ${{ github.token }}
-          MPV_URL: ${{ github.event.inputs.mpv_aar_url || vars.MPV_AAR_URL }}
-          FFMPEG_URL: ${{ github.event.inputs.ffmpeg_aar_url || vars.FFMPEG_AAR_URL }}
         run: |
           mkdir -p app/libs
-          if [ ! -f app/libs/lib-mpvplayer-release.aar ]; then
-            gh release download aar --pattern lib-mpvplayer-release.aar --dir /tmp --clobber || true
-            if [ -f /tmp/lib-mpvplayer-release.aar ]; then mv /tmp/lib-mpvplayer-release.aar app/libs/lib-mpvplayer-release.aar; fi
-          fi
-          if [ ! -f app/libs/lib-decoder-ffmpeg-release.aar ]; then
-            gh release download aar --pattern lib-decoder-ffmpeg-release.aar --dir /tmp --clobber || true
-            if [ -f /tmp/lib-decoder-ffmpeg-release.aar ]; then mv /tmp/lib-decoder-ffmpeg-release.aar app/libs/lib-decoder-ffmpeg-release.aar; fi
-          fi
-          if [ ! -f app/libs/lib-mpvplayer-release.aar ] && [ -n "$MPV_URL" ]; then
-            curl -fL "$MPV_URL" -o app/libs/lib-mpvplayer-release.aar
-          fi
-          if [ ! -f app/libs/lib-decoder-ffmpeg-release.aar ] && [ -n "$FFMPEG_URL" ]; then
-            curl -fL "$FFMPEG_URL" -o app/libs/lib-decoder-ffmpeg-release.aar
-          fi
+          gh release download aar --repo "${{ github.repository }}" --pattern '*.aar' --dir app/libs --clobber
           ls -l app/libs
-          if [ ! -f app/libs/lib-mpvplayer-release.aar ]; then
-            echo "::error::Missing app/libs/lib-mpvplayer-release.aar. Upload it to a Release tagged 'aar' or set the MPV_AAR_URL repository variable."
-            exit 1
-          fi
-          if [ ! -f app/libs/lib-decoder-ffmpeg-release.aar ]; then
-            echo "::error::Missing app/libs/lib-decoder-ffmpeg-release.aar. Upload it to a Release tagged 'aar' or set the FFMPEG_AAR_URL repository variable."
-            exit 1
-          fi
 
       - name: Prepare signing config
         run: |
