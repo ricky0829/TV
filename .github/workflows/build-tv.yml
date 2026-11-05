@@ -90,7 +90,7 @@ jobs:
         run: |
           TAG=leanback-latest
           if ! gh release view "$TAG" > /dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+            gh release create "$TAG" --target "$GITHUB_SHA" \
               --title "Leanback build 5.8.7" \
               --notes "Automated leanback APK build from the fongmi branch ($GITHUB_SHA)."
           fi
