@@ -15,7 +15,11 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 
 - `.github/workflows/sync-upstream.yml`：每天 03:23（北京时间）抓取上游并合并。冲突时创建 issue 并中止；成功则 push，并显式执行 `gh workflow run build-tv.yml --ref fongmi`。
 - 注意：用仓库自带 `GITHUB_TOKEN` 推送不会触发 `push` 事件，所以同步工作流必须显式 dispatch 构建。
-- `.github/workflows/build-tv.yml`：从 Release `aar` 下载全部 `*.aar`，计算下一个 `5.8.7-N` 版本号，构建 leanback APK，上传 artifact，并创建同名 tag / Release（两个 APK）。
+- **仓库必须开启 Issues**（fork 默认是关闭的）：`Create conflict issue` 与 `Verify custom patches` 都靠 `gh issue create` 报警。检查 `GET /repos/ricky0829/TV` 的 `has_issues`，为 false 时 `PATCH {"has_issues":true}`。
+- 合并成功后、push 之前，同步工作流还会做两件事：
+  1. `Sync version metadata`：从 `upstream/fongmi:app/build.gradle` 读取上游 `versionName` / `versionCode`，与 `gradle.properties` 的 `tvBaseVersion`、`app/build.gradle` 对比，不一致就自动改写并提交一个 chore commit。上游升级后序号自然从 1 重算。
+  2. `Verify custom patches`：逐项 grep 本节「自定义改动清单」里的关键符号（选集按钮、竖排站点、多排选集、分辨率、左向焦点、版本化构建等）；缺失则创建 issue 并 `exit 1`，**中止推送与发布**，避免发出丢功能的版本。
+- `.github/workflows/build-tv.yml`：从 Release `aar` 下载全部 `*.aar`，计算下一个版本号，构建 leanback APK，上传 artifact，并创建同名 tag / Release（两个 APK）。
 - 手动同步：Actions 中运行 `Sync upstream`；或本地 `git fetch upstream fongmi && git merge upstream/fongmi`。
 
 ## 自定义改动清单（解决冲突时逐项确认）
@@ -63,20 +67,21 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 
 ## 版本与发布
 
-- 规则见仓库根目录 `README.md` 的「版本与发布规则」：`<上游版本>-<自然数>`，
-  每次成功构建递增 1，例 `5.8.7-1`、`5.8.7-2`……
+- 版本号规则：`<上游版本>-<自然数>`，序号从 1 起，**每成功构建一次递增 1**，
+  例 `5.8.7-1`、`5.8.7-2`、`5.8.7-3`……；上游升级后序号自动从 1 重算。
 - 单一来源：`gradle.properties` 的 `tvBaseVersion`；`app/build.gradle` 的
   `versionName` 优先取 CI 注入的 `TV_VERSION_NAME`，本地构建回落到 `tvBaseVersion`。
-  `versionCode` 恒为上游值 587，保证同签名可直接覆盖安装。
+  `versionCode` 跟随上游（当前 587），由同步工作流自动维护，保证同签名可直接覆盖安装。
 - `build-tv.yml` 的 `Compute version` 用 `git ls-remote --tags` 找最大序号 +1；
   `Publish release` 会 `gh release create "$VERSION" --target "$GITHUB_SHA"` 创建
   **新 tag 与新 Release**（tag 指向当次 commit），附两个 ABI 的 APK。
 - 仓库**不维护 `leanback-latest` 之类的滚动别名**：那种做法会让 tag / target_commitish /
   published_at 一直停在首次创建的 commit，页面看起来没有更新，也无法回溯版本。
-  下载链接一律写具体版本号 `releases/download/5.8.7-N/...`。
+  已发布的历史版本不覆盖，下载链接一律写具体版本号 `releases/download/5.8.7-N/...`。
 - Release 说明只写 commit、构建时间（**北京时间 UTC+8**）、versionName/versionCode、
   资产清单；**不要写签名信息**（签名细节放在本文件的「签名」章节，不进发布说明）。
-- 上游升级时只改 `tvBaseVersion`，序号自动从 1 重算；不要手工补号。
+- 上游升级时 `sync-upstream.yml` 的 `Sync version metadata` 会自动读取上游
+  `versionName` / `versionCode` 并更新上述两处，**不要手工补号**。
 
 ## 验证
 

@@ -63,6 +63,70 @@ jobs:
         run: |
           echo "::warning::gradle/libs.versions.toml changed. If the media3 AARs no longer compile, refresh them from a matching mirror and re-upload to the 'aar' release."
 
+      - name: Sync version metadata
+        if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.up_to_date == 'false'
+        id: version
+        run: |
+          UP_GRADLE=$(git show upstream/fongmi:app/build.gradle)
+          UP_NAME=$(printf '%s\n' "$UP_GRADLE" | sed -n 's/^[[:space:]]*versionName[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+          UP_CODE=$(printf '%s\n' "$UP_GRADLE" | sed -n 's/^[[:space:]]*versionCode[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
+          if [ -z "$UP_NAME" ] || [ -z "$UP_CODE" ]; then
+            echo "::warning::无法从上游 app/build.gradle 解析版本号，跳过版本元数据同步"
+            exit 0
+          fi
+          CUR_NAME=$(sed -n 's/^tvBaseVersion=//p' gradle.properties | head -1)
+          CUR_CODE=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle | head -1)
+          echo "upstream=$UP_NAME (code $UP_CODE), fork=$CUR_NAME (code $CUR_CODE)"
+          if [ "$UP_NAME" = "$CUR_NAME" ] && [ "$UP_CODE" = "$CUR_CODE" ]; then
+            echo "版本元数据一致，无需更新"
+            exit 0
+          fi
+          sed -i "s/^tvBaseVersion=.*/tvBaseVersion=$UP_NAME/" gradle.properties
+          sed -i "s/^\([[:space:]]*versionCode[[:space:]]*\)[0-9][0-9]*/\1$UP_CODE/" app/build.gradle
+          git add gradle.properties app/build.gradle
+          git commit -m "chore: sync upstream version to $UP_NAME (code $UP_CODE)"
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
+          echo "version=$UP_NAME" >> "$GITHUB_OUTPUT"
+          echo "::notice::版本基准已同步为 $UP_NAME，下一次构建的序号从 1 重新开始"
+
+      - name: Verify custom patches
+        if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.up_to_date == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          : > /tmp/missing.txt
+          check() {
+            if ! grep -qF "$2" "$1" 2>/dev/null; then
+              echo "::error::自定义改动缺失：$3（$1 未找到 $2）"
+              echo "- $3（$1 缺少 $2）" >> /tmp/missing.txt
+            fi
+          }
+          check app/src/leanback/res/layout/view_control_vod_action.xml '@+id/episodes' '控制栏选集按钮'
+          check app/src/leanback/res/layout/activity_collect.xml '@+id/sites' '搜索页左侧竖排站点'
+          check app/src/leanback/java/com/fongmi/android/tv/ui/activity/VideoActivity.java 'getEpisodeSpan' '详情页多排选集'
+          check app/src/leanback/java/com/fongmi/android/tv/ui/activity/VideoActivity.java 'renderPlaybackMetadata' '播放页分辨率'
+          check app/src/leanback/java/com/fongmi/android/tv/ui/activity/CollectActivity.java 'KeyUtil.isLeftKey' '搜索页左向焦点'
+          check app/src/leanback/java/com/fongmi/android/tv/ui/dialog/EpisodeDialog.java 'class EpisodeDialog' '播放中选集弹窗'
+          check app/src/leanback/res/layout/adapter_episode_grid.xml 'ellipsize' '选集网格布局'
+          check gradle.properties 'tvBaseVersion' '版本基准'
+          check .github/workflows/build-tv.yml 'Compute version' '版本化构建'
+          check .github/workflows/build-tv.yml 'gh release create' '新 Release 发布'
+          if [ -s /tmp/missing.txt ]; then
+            {
+              echo "上游合并后检测到自定义改动缺失，已中止推送与发布。"
+              echo
+              echo "**缺失项**"
+              echo
+              cat /tmp/missing.txt
+              echo
+              echo "请按 .trae/skills/fongmi-tv-upstream-sync/SKILL.md 的清单逐项恢复后重新同步。"
+            } > /tmp/issue.md
+            gh issue create --title "上游同步后自定义改动缺失" --body-file /tmp/issue.md
+            echo "::error::自定义改动不完整，已中止推送与发布"
+            exit 1
+          fi
+          echo "自定义改动清单校验通过"
+
       - name: Create conflict issue
         if: steps.merge.outputs.conflict == 'true'
         env:
