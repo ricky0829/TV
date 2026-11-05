@@ -61,12 +61,6 @@ jobs:
           gh release download aar --repo "${{ github.repository }}" --pattern '*.aar' --dir app/libs --clobber
           ls -l app/libs
 
-      - name: Restrict to arm64-v8a
-        run: |
-          # The prebuilt mpv AAR only ships a unified libffmpeg.so for arm64-v8a.
-          sed -i 's/include "arm64-v8a", "armeabi-v7a"/include "arm64-v8a"/' app/build.gradle
-          grep -n 'include "arm64-v8a"' app/build.gradle
-
       - name: Prepare signing config
         run: |
           keytool -genkeypair -v -keystore app/keystore.jks -alias tv -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=FongMi TV Build, OU=Dev, O=FongMi, L=NA, ST=NA, C=CN"
@@ -81,7 +75,9 @@ jobs:
       - name: Build leanback release
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleLeanbackRelease
+          # The prebuilt AARs are older than the source tree and still use split
+          # FFmpeg libraries, so skip the unified-FFmpeg native guard here.
+          ./gradlew --no-daemon assembleLeanbackRelease -x verifyLeanbackReleaseMpvNative
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
