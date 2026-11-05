@@ -42,16 +42,16 @@ jobs:
           echo "--- preinstalled platforms ---"
           ls "$ANDROID_HOME/platforms" || true
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install "build-tools;37.0.0" "platform-tools" || true
+          # The runner ships android-37.0/37.1/37.2 but AGP looks for android-37.
           if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
-            "$SDKMANAGER" --install --channel=3 "platforms;android-37" "build-tools;37.0.0" "platform-tools" || true
+            SRC=$(ls -d "$ANDROID_HOME"/platforms/android-37.* 2>/dev/null | sort | tail -n 1)
+            if [ -n "$SRC" ]; then
+              echo "linking $SRC -> android-37"
+              sudo ln -sfn "$SRC" "$ANDROID_HOME/platforms/android-37"
+            fi
           fi
-          if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
-            echo "::warning::android-37 is unavailable on this runner, falling back to android-36"
-            "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-            sed -i 's/^compileSdk = "37"/compileSdk = "36"/; s/^targetSdk = "37"/targetSdk = "36"/; s/^buildTools = "37.0.0"/buildTools = "36.0.0"/' gradle/libs.versions.toml
-          fi
-          echo "--- effective versions ---"
-          head -n 8 gradle/libs.versions.toml
+          ls "$ANDROID_HOME/platforms"
 
       - name: Fetch prebuilt AARs
         env:
