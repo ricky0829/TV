@@ -351,7 +351,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
 
     private int getEpisodeSpan() {
         int width = ResUtil.getScreenWidth() - ResUtil.dp2px(48);
-        return Math.clamp(width / Math.max(1, ResUtil.dp2px(110)), 4, 12);
+        return Math.clamp(width / Math.max(1, ResUtil.dp2px(170)), 3, 8);
     }
 
     private void setRecyclerView() {
@@ -837,8 +837,6 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         boolean multi = items.size() >= 2;
         mBinding.episode.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
         mBinding.control.action.episodes.setVisibility(multi ? View.VISIBLE : View.GONE);
-        mBinding.control.action.next.setNextFocusLeftId(multi ? R.id.episodes : R.id.ending);
-        mBinding.control.action.ending.setNextFocusRightId(multi ? R.id.episodes : R.id.next);
         mEpisodeAdapter.addAll(items);
         setArrayAdapter(items.size());
         setR2Callback();

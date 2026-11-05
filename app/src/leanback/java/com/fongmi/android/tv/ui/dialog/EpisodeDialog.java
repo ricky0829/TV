@@ -37,7 +37,7 @@ public class EpisodeDialog extends BaseAlertDialog implements EpisodeAdapter.OnC
 
     private int getSpanCount() {
         int width = (int) (ResUtil.getScreenWidth() * 0.7f) - ResUtil.dp2px(48);
-        return Math.clamp(width / Math.max(1, ResUtil.dp2px(110)), 3, 8);
+        return Math.clamp(width / Math.max(1, ResUtil.dp2px(150)), 3, 6);
     }
 
     @Override

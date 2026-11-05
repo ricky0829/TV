@@ -13,15 +13,6 @@
         android:orientation="horizontal">
 
         <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/episodes"
-            style="@style/Control"
-            android:layout_marginEnd="8dp"
-            android:nextFocusLeft="@id/ending"
-            android:text="@string/detail_episode"
-            android:visibility="gone"
-            tools:visibility="visible" />
-
-        <com.google.android.material.textview.MaterialTextView
             android:id="@+id/next"
             style="@style/Control"
             android:layout_marginEnd="8dp"
@@ -32,6 +23,14 @@
             style="@style/Control"
             android:layout_marginEnd="8dp"
             android:text="@string/play_prev" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/episodes"
+            style="@style/Control"
+            android:layout_marginEnd="8dp"
+            android:text="@string/detail_episode"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/parse"
@@ -147,7 +146,7 @@
             android:id="@+id/ending"
             style="@style/Control"
             android:layout_marginEnd="8dp"
-            android:nextFocusRight="@id/episodes"
+            android:nextFocusRight="@id/next"
             android:text="@string/play_ed" />
 
         <com.fongmi.android.tv.ui.custom.PlaybackButtonsView
