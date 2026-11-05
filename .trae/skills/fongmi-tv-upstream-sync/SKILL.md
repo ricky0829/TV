@@ -54,6 +54,13 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 3. 上传到本仓库 Release `aar`（同名资产覆盖），再触发构建。
 4. 若新 AAR 提供了原生运动补偿 API，可移除 `MpvMotionSupport` 的反射路径，改用原生方法。
 
+## 签名
+
+- CI 优先使用仓库 Secrets：`SIGNING_KEYSTORE`（keystore 的 Base64）与 `SIGNING_STORE_PASSWORD`；缺失时才临时生成并给出警告。
+- 固定签名后，自建版本之间可直接覆盖升级；从更早的临时签名版本切换仍需卸载一次，官方版始终需要先卸载。
+- 本地备份：`d:\documents\trae\fongmi\signing\fongmi-tv-release.jks`（alias `tv`）。丢失后无法再签出可覆盖升级的版本。
+- 验证方式：`keytool -list -v` 得到的证书 SHA256 应与 APK 签名块中的证书 SHA256 一致。
+
 ## 验证
 
 - `Build Leanback APK` 为绿，Release `leanback-latest` 两个 APK 更新时间变化。
