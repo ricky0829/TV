@@ -1,0 +1,103 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "23 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fongmi
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/FongMi/TV.git 2>/dev/null || true
+          git fetch --no-tags upstream fongmi
+
+      - name: Merge upstream
+        id: merge
+        run: |
+          if [ "$(git rev-list --count HEAD..upstream/fongmi)" = "0" ]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BEFORE=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
+          echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          if git merge --no-edit upstream/fongmi; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            AFTER=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
+            if [ "$BEFORE" != "$AFTER" ]; then
+              echo "versions_changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "versions_changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            git diff --name-only --diff-filter=U | sort > /tmp/conflicts.txt
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Warn about AAR refresh
+        if: steps.merge.outputs.versions_changed == 'true'
+        run: |
+          echo "::warning::gradle/libs.versions.toml changed. If the media3 AARs no longer compile, refresh them from a matching mirror and re-upload to the 'aar' release."
+
+      - name: Create conflict issue
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -s /tmp/conflicts.txt ]; then echo "unknown" > /tmp/conflicts.txt; fi
+          {
+            echo "自动合并 FongMi/TV 的 \`fongmi\` 分支失败，需要手动解决冲突后再推送。"
+            echo
+            echo "**冲突文件**"
+            echo
+            sed 's/^/- /' /tmp/conflicts.txt
+            echo
+            echo "**本地处理**"
+            echo
+            echo '```bash'
+            echo "git remote add upstream https://github.com/FongMi/TV.git"
+            echo "git fetch upstream fongmi"
+            echo "git checkout fongmi"
+            echo "git merge upstream/fongmi"
+            echo "# 解决冲突并验证后"
+            echo "git push origin fongmi"
+            echo '```'
+            echo
+            echo "处理要点见项目 skill \`fongmi-tv-upstream-sync\`：分辨率/选集/多排选集/竖排站点改动、运动补偿兼容层、预编译 AAR 版本。"
+          } > /tmp/issue.md
+          gh issue create --title "上游同步冲突：需要手动合并 FongMi/TV" --body-file /tmp/issue.md
+          echo "::warning::merge conflict, see the created issue"
+
+      - name: Push merge
+        if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.up_to_date == 'false'
+        run: git push origin HEAD:fongmi
+
+      - name: Trigger build
+        if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.up_to_date == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-tv.yml --ref fongmi
