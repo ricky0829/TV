@@ -22,7 +22,7 @@ public final class MpvMotionSupport {
     }
 
     public static boolean isSupported(@Nullable MpvPlayer player) {
-        return player != null && player.isMpvInitialized() && MpvUtil.isVulkanSupported();
+        return player != null && MpvPlayer.isAvailable() && MpvUtil.isVulkanSupported();
     }
 
     public static int getFps() {
@@ -37,7 +37,7 @@ public final class MpvMotionSupport {
     }
 
     public static boolean setFps(@Nullable MpvPlayer player, int fps) {
-        if (player == null || !player.isMpvInitialized()) return false;
+        if (player == null) return false;
         boolean enabled = fps > 0 && MpvUtil.isVulkanSupported();
         if (!setProperty(player, "interpolation", enabled ? "yes" : "no")) return false;
         if (enabled) {
