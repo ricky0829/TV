@@ -75,9 +75,7 @@ jobs:
       - name: Build leanback release
         run: |
           chmod +x gradlew
-          # The prebuilt AARs are older than the source tree and still use split
-          # FFmpeg libraries, so skip the unified-FFmpeg native guard here.
-          ./gradlew --no-daemon assembleLeanbackRelease -x verifyLeanbackReleaseMpvNative
+          ./gradlew --no-daemon assembleLeanbackRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

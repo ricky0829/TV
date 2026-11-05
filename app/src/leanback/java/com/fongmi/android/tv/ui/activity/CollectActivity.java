@@ -107,7 +107,6 @@ public class CollectActivity extends BaseActivity {
 
     private void setRecyclerView() {
         mBinding.sites.setVerticalSpacing(ResUtil.dp2px(8));
-        mBinding.sites.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         mBinding.sites.setAdapter(mAdapter = new CollectAdapter());
     }
 

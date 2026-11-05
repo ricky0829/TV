@@ -8,13 +8,11 @@ import androidx.media3.mpvplayer.MpvPlayer;
 
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.databinding.ViewMpvMotionBinding;
+import com.fongmi.android.tv.player.mpv.MpvMotionSupport;
 import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.button.MaterialButton;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.MoreExecutors;
 
 import java.util.concurrent.CancellationException;
 
@@ -30,7 +28,7 @@ final class MpvMotionSettingPanel {
 
     MpvMotionSettingPanel(ViewMpvMotionBinding binding, @Nullable Player player) {
         this.binding = binding;
-        this.player = player instanceof MpvPlayer mpv ? mpv : null;
+        player = player instanceof MpvPlayer mpv ? mpv : null;
     }
 
     void bind() {
@@ -39,14 +37,14 @@ final class MpvMotionSettingPanel {
         String[] labels = ResUtil.getStringArray(R.array.select_mpv_motion);
         MaterialButton[] modes = getModes();
         for (int i = 0; i < modes.length; i++) bindMode(modes[i], labels[i], i);
-        player.addMotionInterpolationListener(motionListener);
+        MpvMotionSupport.addListener(player, motionListener);
         updateMotion();
     }
 
     void release() {
         released = true;
         for (MaterialButton mode : getModes()) mode.setOnClickListener(null);
-        if (player != null) player.removeMotionInterpolationListener(motionListener);
+        if (player != null) MpvMotionSupport.removeListener(player, motionListener);
     }
 
     private void bindMode(MaterialButton button, String label, int index) {
@@ -56,10 +54,10 @@ final class MpvMotionSettingPanel {
     }
 
     private void selectMode(int index) {
-        if (player == null || !player.isMotionInterpolationSupported() || player.isMotionInterpolationUpdatePending()) return;
-        Futures.addCallback(player.setMotionInterpolationFps(FRAME_RATES[index]), new FutureCallback<>() {
+        if (player == null || !MpvMotionSupport.isSupported(player) || MpvMotionSupport.isUpdatePending(player)) return;
+        MpvMotionSupport.setFps(player, FRAME_RATES[index], new MpvMotionSupport.Callback() {
             @Override
-            public void onSuccess(@Nullable Void result) {
+            public void onSuccess() {
                 onApplied(index);
             }
 
@@ -67,7 +65,7 @@ final class MpvMotionSettingPanel {
             public void onFailure(Throwable error) {
                 onFailed(error);
             }
-        }, MoreExecutors.directExecutor());
+        });
     }
 
     private void onApplied(int index) {
@@ -82,11 +80,11 @@ final class MpvMotionSettingPanel {
 
     private void updateMotion() {
         if (released || player == null) return;
-        int fps = player.getMotionInterpolationFps();
-        boolean supported = player.isMotionInterpolationSupported();
+        int fps = MpvMotionSupport.getFps(player);
+        boolean supported = MpvMotionSupport.isSupported(player);
         SettingPanelViews.applyEnabled(binding.modes, supported);
         if (supported) updateChecked(fps);
-        binding.status.setText(getStatusText(supported, player.isMotionInterpolationUpdatePending(), fps, player.getMotionInterpolationEffectiveTargetFps()));
+        binding.status.setText(getStatusText(supported, MpvMotionSupport.isUpdatePending(player), fps, MpvMotionSupport.getEffectiveFps(player)));
     }
 
     private void updateChecked(int fps) {

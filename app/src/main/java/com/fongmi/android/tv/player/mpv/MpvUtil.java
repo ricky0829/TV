@@ -143,14 +143,7 @@ public final class MpvUtil {
         builder.addPreInitStringOption("proxy-url", "http://127.0.0.1:" + Proxy.getPort() + "/proxy?");
         builder.addTlsCaFileFromAsset(App.get(), ASSET_CA_FILE, Path.files(ASSET_CA_FILE)).addAndroidSubtitleOptions(App.get(), buildSubtitleOptions(font));
         if (PreloadSetting.isEnabled()) builder.addDiskCacheOptions(cacheDir, PreloadSetting.getTimeSeconds());
-        addMotionOptions(builder);
         return builder.build();
-    }
-
-    static void addMotionOptions(MpvPlayerConfig.Builder builder) {
-        int fps = PlayerSetting.getMpvMotionFps();
-        if (fps == 0 || !isVulkanSupported()) return;
-        builder.setMotionInterpolationFps(fps);
     }
 
     public static List<MpvScripts.Item> readScripts() {
