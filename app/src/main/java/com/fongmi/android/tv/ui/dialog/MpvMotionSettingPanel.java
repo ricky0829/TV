@@ -28,7 +28,7 @@ final class MpvMotionSettingPanel {
 
     MpvMotionSettingPanel(ViewMpvMotionBinding binding, @Nullable Player player) {
         this.binding = binding;
-        player = player instanceof MpvPlayer mpv ? mpv : null;
+        this.player = player instanceof MpvPlayer mpv ? mpv : null;
     }
 
     void bind() {
