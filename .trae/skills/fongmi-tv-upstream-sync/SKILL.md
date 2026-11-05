@@ -9,13 +9,13 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 
 - 仓库：`ricky0829/TV`，分支 `fongmi`
 - 本地：`d:\documents\trae\fongmi\TV-fongmi`
-- Release：`aar`（预编译 AAR）、`leanback-latest`（两个 APK）
+- Release：`aar`（预编译 AAR）、`5.8.7-N`（每次构建的版本化 APK，N 递增）
 
 ## 自动化链路
 
 - `.github/workflows/sync-upstream.yml`：每天 03:23（北京时间）抓取上游并合并。冲突时创建 issue 并中止；成功则 push，并显式执行 `gh workflow run build-tv.yml --ref fongmi`。
 - 注意：用仓库自带 `GITHUB_TOKEN` 推送不会触发 `push` 事件，所以同步工作流必须显式 dispatch 构建。
-- `.github/workflows/build-tv.yml`：从 Release `aar` 下载全部 `*.aar`，构建 leanback APK，上传 artifact，并覆盖 Release `leanback-latest` 的两个 APK。
+- `.github/workflows/build-tv.yml`：从 Release `aar` 下载全部 `*.aar`，计算下一个 `5.8.7-N` 版本号，构建 leanback APK，上传 artifact，并创建同名 tag / Release（两个 APK）。
 - 手动同步：Actions 中运行 `Sync upstream`；或本地 `git fetch upstream fongmi && git merge upstream/fongmi`。
 
 ## 自定义改动清单（解决冲突时逐项确认）
@@ -70,14 +70,18 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
   `versionCode` 恒为上游值 587，保证同签名可直接覆盖安装。
 - `build-tv.yml` 的 `Compute version` 用 `git ls-remote --tags` 找最大序号 +1；
   `Publish release` 会 `gh release create "$VERSION" --target "$GITHUB_SHA"` 创建
-  **新 tag 与新 Release**（tag 指向当次 commit），再更新滚动别名 `leanback-latest`。
-- 不要用「只覆盖 `leanback-latest` 资产」当作发布：那样 tag / target_commitish /
-  published_at 会一直停在首次创建的 commit，页面看起来没有更新，也无法回溯版本。
+  **新 tag 与新 Release**（tag 指向当次 commit），附两个 ABI 的 APK。
+- 仓库**不维护 `leanback-latest` 之类的滚动别名**：那种做法会让 tag / target_commitish /
+  published_at 一直停在首次创建的 commit，页面看起来没有更新，也无法回溯版本。
+  下载链接一律写具体版本号 `releases/download/5.8.7-N/...`。
+- Release 说明只写 commit、构建时间（**北京时间 UTC+8**）、versionName/versionCode、
+  资产清单；**不要写签名信息**（签名细节放在本文件的「签名」章节，不进发布说明）。
 - 上游升级时只改 `tvBaseVersion`，序号自动从 1 重算；不要手工补号。
 
 ## 验证
 
-- `Build Leanback APK` 为绿，Release `leanback-latest` 两个 APK 更新时间变化。
+- `Build Leanback APK` 为绿，出现新的 `5.8.7-N` Release：tag 指向当次 commit，
+  两个 APK 资产齐全，说明里的构建时间为北京时间。
 - 安装后检查：标题下分辨率、控制栏选集按钮、详情页多排选集、搜索页左侧竖排站点、mpv 播放设置中的运动补偿。
 - 运动补偿前提：设备支持 Vulkan 1.2；面板显示的目标帧率不高于实际刷新率。
 - 可在 APK 的 dex 中检查 `playbackProperties`、`setStringOptionOrProperty` 是否存在，确认混淆保留生效。

@@ -17,10 +17,13 @@ Fork of https://github.com/FongMi/TV.
 2. 把该版本号注入 `versionName`（`versionCode` 保持上游的 587 不变），用仓库持久签名构建；
 3. **创建同名 tag 与 Release，tag 指向当次 commit**，附 `leanback-arm64_v8a.apk` 与
    `leanback-armeabi_v7a.apk` 两个资产；
-4. 同步更新滚动别名 `leanback-latest` 的两个资产与说明，固定下载链接保持不变。
+4. Release 说明只记录 commit、构建时间（**北京时间 UTC+8**）、版本号与资产清单，
+   不写签名信息。
 
 使用约定：
 
-- 追溯/回滚具体版本用 `5.8.7-N`；只想拿最新构建用 `leanback-latest`。
+- 仓库**不维护滚动别名**，只有版本化 Release。下载地址用具体版本号：
+  `https://github.com/ricky0829/TV/releases/download/5.8.7-N/leanback-arm64_v8a.apk`。
+- 追溯/回滚只需选对应的 `5.8.7-N`。
 - 上游升级（例如 5.8.8）时，只改 `gradle.properties` 的 `tvBaseVersion`，序号自动从 1 重新开始。
 - 已发布的历史版本不覆盖；每次修改都是一个新的、可回溯的 Release。

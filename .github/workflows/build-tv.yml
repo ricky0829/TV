@@ -118,29 +118,18 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          BUILT_AT=$(date -u '+%Y-%m-%d %H:%M UTC')
+          BUILT_AT="$(date -u -d '+8 hours' '+%Y-%m-%d %H:%M') 北京时间 (UTC+8)"
           APK_DIR=app/build/outputs/apk/leanback/release
           NOTES="Automated leanback build $VERSION from the fongmi branch.
 
           Commit: $GITHUB_SHA ($SHORT_SHA)
           Built: $BUILT_AT
           APK versionName: $VERSION / versionCode: 587
-          Signed with the persistent key from repository secrets.
           Assets: leanback-arm64_v8a.apk / leanback-armeabi_v7a.apk"
 
           # Versioned release: a fresh tag pointing at this exact commit.
           gh release create "$VERSION" --target "$GITHUB_SHA" \
             --title "FongMi TV $VERSION" --notes "$NOTES"
           gh release upload "$VERSION" "$APK_DIR"/*.apk
-
-          # Rolling alias: keep the stable download URL on the newest build.
-          TAG=leanback-latest
-          if ! gh release view "$TAG" > /dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" \
-              --title "Leanback latest ($VERSION)" --notes "$NOTES"
-          else
-            gh release edit "$TAG" --title "Leanback latest ($VERSION)" --notes "$NOTES"
-          fi
-          gh release upload "$TAG" "$APK_DIR"/*.apk --clobber
 
           gh release view "$VERSION" --json tagName,assets --jq '.tagName, (.assets[].name)'
