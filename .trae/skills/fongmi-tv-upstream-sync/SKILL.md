@@ -61,6 +61,20 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 - 本地备份：`d:\documents\trae\fongmi\signing\fongmi-tv-release.jks`（alias `tv`）。丢失后无法再签出可覆盖升级的版本。
 - 验证方式：`keytool -list -v` 得到的证书 SHA256 应与 APK 签名块中的证书 SHA256 一致。
 
+## 版本与发布
+
+- 规则见仓库根目录 `README.md` 的「版本与发布规则」：`<上游版本>-<自然数>`，
+  每次成功构建递增 1，例 `5.8.7-1`、`5.8.7-2`……
+- 单一来源：`gradle.properties` 的 `tvBaseVersion`；`app/build.gradle` 的
+  `versionName` 优先取 CI 注入的 `TV_VERSION_NAME`，本地构建回落到 `tvBaseVersion`。
+  `versionCode` 恒为上游值 587，保证同签名可直接覆盖安装。
+- `build-tv.yml` 的 `Compute version` 用 `git ls-remote --tags` 找最大序号 +1；
+  `Publish release` 会 `gh release create "$VERSION" --target "$GITHUB_SHA"` 创建
+  **新 tag 与新 Release**（tag 指向当次 commit），再更新滚动别名 `leanback-latest`。
+- 不要用「只覆盖 `leanback-latest` 资产」当作发布：那样 tag / target_commitish /
+  published_at 会一直停在首次创建的 commit，页面看起来没有更新，也无法回溯版本。
+- 上游升级时只改 `tvBaseVersion`，序号自动从 1 重算；不要手工补号。
+
 ## 验证
 
 - `Build Leanback APK` 为绿，Release `leanback-latest` 两个 APK 更新时间变化。
