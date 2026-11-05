@@ -65,14 +65,25 @@ jobs:
           ls -l app/libs
 
       - name: Prepare signing config
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
         run: |
-          keytool -genkeypair -v -keystore app/keystore.jks -alias tv -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=FongMi TV Build, OU=Dev, O=FongMi, L=NA, ST=NA, C=CN"
+          if [ -n "$SIGNING_KEYSTORE" ] && [ -n "$SIGNING_STORE_PASSWORD" ]; then
+            printf '%s' "$SIGNING_KEYSTORE" | base64 -d > app/keystore.jks
+            STORE_PASSWORD="$SIGNING_STORE_PASSWORD"
+            echo "Signing with the persistent key from repository secrets."
+          else
+            echo "::warning::SIGNING_KEYSTORE is not configured; generating a throwaway key, so this APK cannot upgrade earlier builds."
+            keytool -genkeypair -v -keystore app/keystore.jks -alias tv -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=FongMi TV Build, OU=Dev, O=FongMi, L=NA, ST=NA, C=CN"
+            STORE_PASSWORD=android
+          fi
           cat > local.properties <<EOF
           sdk.dir=$ANDROID_HOME
           storeFile=keystore.jks
           keyAlias=tv
-          storePassword=android
-          keyPassword=android
+          storePassword=$STORE_PASSWORD
+          keyPassword=$STORE_PASSWORD
           EOF
 
       - name: Build leanback release
