@@ -318,14 +318,6 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         return !playbackReplaced && isBindingOwner() && isOwner();
     }
 
-    protected boolean isNativePlaybackCurrent() {
-        return isPlaybackCurrent() && !isWebPlaybackActive();
-    }
-
-    private boolean isNativePlaybackOwner() {
-        return isOwner() && isBindingOwner() && !isWebPlaybackActive();
-    }
-
     protected boolean hasPlaybackSource() {
         return mService != null && isOwner() && !player().isEmpty();
     }
@@ -386,7 +378,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
     }
 
     private boolean isPlaybackState(int state) {
-        return mController != null && player().getPlayer().getPlaybackState() == state;
+        return mController != null && mController.getPlaybackState() == state;
     }
 
     protected void onServiceConnected() {
@@ -428,8 +420,8 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
     @Override
     public void onDiscMenuStateChanged(@NonNull DiscMenuState state) {
-        if (!isNativePlaybackCurrent()) return;
-        updateKeepScreenOn(player().getPlayer().isPlaying());
+        if (!isOwner()) return;
+        updateKeepScreenOn(mController != null && mController.isPlaying());
         if (isBuffering()) onStateChanged(Player.STATE_BUFFERING);
     }
 
@@ -530,7 +522,12 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
     @SuppressLint("ClickableViewAccessibility")
     private void prepareWebPlayback(ViewGroup parent, @Nullable Consumer<MotionEvent> touchObserver) {
-        stopNativePlaybackForWeb();
+        discMenuHeldKeys.clear();
+        PlayerManager player = player();
+        player.reset();
+        player.stop();
+        player.clear();
+        hidePlayerViewForWebPlayback();
         if (webView == null) {
             webView = BrowserWebView.createPlayback(this, webViewListener);
             addWebView(parent);
@@ -546,15 +543,6 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         webPlaybackState = Player.STATE_BUFFERING;
         getSeekView().setPlayer(null);
         getSeekView().setVisibility(View.GONE);
-    }
-
-    private void stopNativePlaybackForWeb() {
-        discMenuHeldKeys.clear();
-        PlayerManager player = player();
-        player.reset();
-        player.stop();
-        player.clear();
-        hidePlayerViewForWebPlayback();
     }
 
     private void addWebView(ViewGroup parent) {
@@ -650,6 +638,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
     private void startPlayerInternal(String key, Result result, boolean useParse, long timeout, long startPositionMs, MediaMetadata metadata) {
         discMenuHeldKeys.clear();
+        attachPlayerView();
         updateNavigationKey(key);
         if (result.needParse() || useParse) player().parse(key, result, useParse, metadata, startPositionMs, endingDurationMs());
         else player().start(PlaySpec.from(result, key, metadata).setEnding(endingDurationMs()), timeout, startPositionMs);
@@ -681,20 +670,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         }
         syncSeekPlayer();
         mController.addListener(this);
-        syncPlaybackState();
         updateKeyIncrement();
-    }
-
-    private void syncPlaybackState() {
-        if (mController == null || !isNativePlaybackCurrent()) return;
-        Player current = player().getPlayer();
-        onPlaybackStateChanged(current.getPlaybackState());
-        onIsPlayingChanged(current.isPlaying());
-        onVideoSizeChanged(current.getVideoSize());
-        onTracksChanged();
-        onDecodeChanged();
-        onMediaOptionsChanged();
-        onDiscMenuStateChanged(current.getDiscMenuState());
     }
 
     private void addSeekListener() {
@@ -776,21 +752,11 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
             attachPlayerView();
             if (resume == null || mService == null || isFinishing() || isInPictureInPictureMode() || !isOwner() || !isBindingOwner()) return;
             Player current = player().getPlayer();
-            if (!resume.matches(current) || current.getPlayWhenReady() || !canResume(current)) return;
-            if (current.getPlaybackState() == Player.STATE_ENDED && isIsoPlaybackOngoing()) current.setPlayWhenReady(true);
-            else player().play();
+            Player target = mController != null ? mController : current;
+            if (!resume.matches(current) || target.getPlayWhenReady() || !canResume(current)) return;
+            if (current.getPlaybackState() == Player.STATE_ENDED && isIsoPlaybackOngoing()) target.setPlayWhenReady(true);
+            else target.play();
         }
-    }
-
-    private void restoreWebPlayback() {
-        pendingResume = null;
-        if (!isBindingOwner()) return;
-        if (playbackReplaced) {
-            stopNativePlaybackForWeb();
-            playbackReplaced = false;
-        }
-        if (resumeWebPlaybackOnResume) webView.resumeVideo();
-        resumeWebPlaybackOnResume = false;
     }
 
     private void reclaimPlayback() {
@@ -808,7 +774,6 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         playbackReplaced = true;
         playbackPlayerState.setValue(null);
         pendingResume = null;
-        if (isWebPlaybackActive()) pauseWebPlaybackForResume();
         detachPlayerView();
         getSeekView().setPlayer(null);
         if (isInPictureInPictureMode()) finish();
@@ -819,7 +784,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
     }
 
     private boolean canDispatch() {
-        return !isFinishing() && !isRedirect() && isBindingOwner() && (getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED) || isInPictureInPictureMode() || PlayerSetting.isBackgroundOn());
+        return !isFinishing() && isBindingOwner();
     }
 
     private void activateService() {
@@ -829,8 +794,6 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         dispatchPendingObservers();
         initService();
         updatePlaybackPlayerState();
-        if (isWebPlaybackActive() && getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) restoreWebPlayback();
-        syncPlaybackState();
     }
 
     private void initService() {
@@ -922,19 +885,11 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         mService.resetSessionActivity();
     }
 
-    private boolean shouldPausePlayback() {
-        return !isBindingOwner() || isFinishing() || isRedirect() || (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED) && !isInPictureInPictureMode() && PlayerSetting.isBackgroundOff());
-    }
-
-    private void pauseWebPlaybackForResume() {
-        resumeWebPlaybackOnResume = !isFinishing() && (resumeWebPlaybackOnResume || !webView.isPlaybackPaused());
-        webView.pauseVideo();
-    }
-
     private void pausePlayback() {
         if (isChangingConfigurations()) return;
         if (isWebPlaybackActive()) {
-            pauseWebPlaybackForResume();
+            resumeWebPlaybackOnResume = !isFinishing() && (resumeWebPlaybackOnResume || !webView.isPlaybackPaused());
+            webView.pauseVideo();
             return;
         }
         if (mService == null || !isOwner() || !isBindingOwner() || (isInPictureInPictureMode() && !isFinishing())) {
@@ -942,9 +897,11 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
             return;
         }
         Player current = player().getPlayer();
+        Player target = mController != null ? mController : current;
         if (isFinishing() || (pendingResume != null && !pendingResume.matches(current))) pendingResume = null;
-        if (!isFinishing() && current != null && current.getPlayWhenReady() && canResume(current) && current.getCurrentMediaItem() != null) pendingResume = new PlaybackResume(current, current.getCurrentMediaItem());
-        player().pause();
+        if (!isFinishing() && current != null && target.getPlayWhenReady() && canResume(current) && current.getCurrentMediaItem() != null) pendingResume = new PlaybackResume(current, current.getCurrentMediaItem());
+        if (mController != null) mController.pause();
+        else if (mService != null) player().pause();
     }
 
     private boolean canResume(Player player) {
@@ -992,55 +949,48 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
         @Override
         public void onPreloadError(Object tag) {
-            if (isNativePlaybackCurrent()) PlaybackActivity.this.onPreloadError(tag);
+            if (isPlaybackCurrent()) PlaybackActivity.this.onPreloadError(tag);
         }
 
         @Override
         public void onPreloadTransition(Object tag, long oldPositionMs, long oldDurationMs) {
-            if (!isNativePlaybackCurrent()) return;
-            playbackEndHandled = false;
-            PlaybackActivity.this.onPreloadTransition(tag, oldPositionMs, oldDurationMs);
+            if (isPlaybackCurrent()) PlaybackActivity.this.onPreloadTransition(tag, oldPositionMs, oldDurationMs);
         }
 
         @Override
         public void onPrepare() {
-            if (isNativePlaybackOwner()) {
+            if (isOwner() && isBindingOwner()) {
                 playbackReplaced = false;
-                playbackEndHandled = false;
                 discMenuHeldKeys.clear();
-                attachPlayerView();
-                onVideoSizeChanged(player().getPlayer().getVideoSize());
                 PlaybackActivity.this.onPrepare();
-                if (shouldPausePlayback()) pausePlayback();
             }
             updatePlaybackPlayerState();
         }
 
         @Override
         public void onTracksChanged() {
-            if (!isNativePlaybackOwner()) return;
-            PlaybackActivity.this.onTracksChanged();
+            if (isOwner()) PlaybackActivity.this.onTracksChanged();
             restoreDebugView();
         }
 
         @Override
         public void onDecodeChanged() {
-            if (isNativePlaybackOwner()) PlaybackActivity.this.onDecodeChanged();
+            if (isOwner()) PlaybackActivity.this.onDecodeChanged();
         }
 
         @Override
         public void onMediaOptionsChanged() {
-            if (isNativePlaybackOwner()) PlaybackActivity.this.onMediaOptionsChanged();
+            if (isOwner()) PlaybackActivity.this.onMediaOptionsChanged();
         }
 
         @Override
         public void onError(String msg) {
-            if (isNativePlaybackOwner()) PlaybackActivity.this.onError(msg);
+            if (isOwner() && isBindingOwner()) PlaybackActivity.this.onError(msg);
         }
 
         @Override
         public boolean onRefresh() {
-            if (!isNativePlaybackOwner()) return false;
+            if (!isOwner() || !isBindingOwner()) return false;
             boolean handled = PlaybackActivity.this.onRefresh();
             updatePlaybackPlayerState();
             return handled;
@@ -1048,7 +998,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
         @Override
         public void onPlayerRebuild(Player player) {
-            if (!isNativePlaybackOwner()) return;
+            if (!isOwner()) return;
             discMenuHeldKeys.clear();
             syncPlayerView(player);
             if (initialized && isBindingOwner() && playbackPlayerState.getValue() != null) playbackPlayerState.setValue(player());
@@ -1056,24 +1006,24 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
         @Override
         public void onDanmakuSourceChanged(@Nullable Uri uri) {
-            if (isNativePlaybackOwner()) setDanmakuSource(uri);
+            if (isOwner()) setDanmakuSource(uri);
         }
 
         @Override
         public void onDanmakuConfigChanged(DanmakuConfig config) {
-            if (isNativePlaybackOwner()) danmakuController.setConfig(config);
+            if (isOwner()) danmakuController.setConfig(config);
         }
 
         @Override
         public void onDanmakuEnabledChanged(boolean enabled) {
-            if (!isNativePlaybackOwner()) return;
+            if (!isOwner()) return;
             liveDanmaku.setEnabled(enabled);
             danmakuController.setEnabled(enabled);
         }
 
         @Override
         public void onDanmakuSent(String text) {
-            if (isNativePlaybackOwner()) danmakuController.sendNow(text);
+            if (isOwner()) danmakuController.sendNow(text);
         }
     };
 
@@ -1088,11 +1038,13 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
     @Override
     public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
-        if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) && pendingResume != null && (mService == null || !pendingResume.matches(player().getPlayer()))) pendingResume = null;
+        if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
+            playbackEndHandled = false;
+            if (pendingResume != null && (mService == null || !pendingResume.matches(player().getPlayer()))) pendingResume = null;
+        }
         if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_AVAILABLE_COMMANDS_CHANGED)) updateKeyIncrement();
-        if (isNativePlaybackCurrent() && events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_DISC_MENU_STATE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) {
-            Player current = player().getPlayer();
-            boolean ended = current.getPlaybackState() == Player.STATE_ENDED && !current.getDiscMenuState().navigationPlaybackOngoing;
+        if (isPlaybackCurrent() && !isWebPlaybackActive() && events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_DISC_MENU_STATE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) {
+            boolean ended = player.getPlaybackState() == Player.STATE_ENDED && !player.getDiscMenuState().navigationPlaybackOngoing;
             if (!ended) {
                 playbackEndHandled = false;
             } else if (!playbackEndHandled) {
@@ -1104,7 +1056,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
     @Override
     public void onIsPlayingChanged(boolean isPlaying) {
-        if (!isNativePlaybackCurrent()) return;
+        if (!isOwner()) return;
         updateKeepScreenOn(isPlaying);
         onPlayingChanged(isPlaying);
     }
@@ -1119,14 +1071,14 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
     @Override
     public void onPlaybackStateChanged(int state) {
-        if (!isNativePlaybackCurrent()) return;
+        if (!isOwner()) return;
         onStateChanged(state);
         getPlayerView().setDiscMenuController(discMenu());
     }
 
     @Override
     public void onVideoSizeChanged(@NonNull VideoSize size) {
-        if (isNativePlaybackCurrent()) onSizeChanged(size);
+        if (isOwner()) onSizeChanged(size);
     }
 
     @Override
@@ -1165,7 +1117,9 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         if (!isWebPlaybackActive()) {
             resumePlayback();
         } else {
-            restoreWebPlayback();
+            pendingResume = null;
+            if (resumeWebPlaybackOnResume) webView.resumeVideo();
+            resumeWebPlaybackOnResume = false;
         }
     }
 
@@ -1181,7 +1135,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         super.onStop();
         discMenuHeldKeys.clear();
         getPlayerView().setDiscMenuController(null);
-        if ((isWebPlaybackActive() || isOwner()) && shouldPausePlayback()) pausePlayback();
+        if ((isWebPlaybackActive() || isOwner()) && (isFinishing() || PlayerSetting.isBackgroundOff())) pausePlayback();
         if (!isInPictureInPictureMode()) detachPlayerView();
     }
 
@@ -1223,11 +1177,6 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         @Override
         public void onPlayingChanged(@NonNull BrowserWebView view, boolean isPlaying) {
             if (webView != view) return;
-            if (isPlaying && shouldPausePlayback()) {
-                pauseWebPlaybackForResume();
-                return;
-            }
-            if (!isBindingOwner()) return;
             if (isPlaying) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             PlaybackActivity.this.onPlayingChanged(isPlaying);
@@ -1235,7 +1184,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
         @Override
         public void onStateChanged(@NonNull BrowserWebView view, @NonNull BrowserWebView.PlaybackState state) {
-            if (webView != view || !isBindingOwner()) return;
+            if (webView != view) return;
             updateWebSeek(state);
             int playerState = state.ended() ? Player.STATE_ENDED : state.buffering() ? Player.STATE_BUFFERING : Player.STATE_READY;
             if (webPlaybackState != playerState) {
@@ -1251,19 +1200,19 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         public void onFailure(@NonNull BrowserWebView view, boolean rendererGone) {
             if (webView != view) return;
             releaseWebView(!rendererGone);
-            if (isBindingOwner()) onError(ResUtil.getString(R.string.error_play_url));
+            onError(ResUtil.getString(R.string.error_play_url));
         }
 
         @Override
         public void onFullscreenChanged(@NonNull BrowserWebView view, boolean fullscreen) {
-            if (webView == view && (!fullscreen || isBindingOwner())) onWebFullscreenChanged(fullscreen);
+            if (webView == view) onWebFullscreenChanged(fullscreen);
         }
 
         @Override
         public void onChallengeChanged(@NonNull BrowserWebView view, boolean visible) {
             if (webView != view) return;
-            if (!visible) hideWebChallenge(view);
-            else if (isBindingOwner()) showWebChallenge(view);
+            if (visible) showWebChallenge(view);
+            else hideWebChallenge(view);
         }
     };
 
@@ -1344,7 +1293,7 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
         }
 
         private void dispatch() {
-            if (pending && canDispatch()) deliver(pendingValue);
+            if (pending) deliver(pendingValue);
         }
     }
 }

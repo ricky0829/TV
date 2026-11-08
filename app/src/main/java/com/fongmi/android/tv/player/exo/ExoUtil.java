@@ -83,11 +83,11 @@ public final class ExoUtil {
     }
 
     static RenderersFactory buildRenderersFactory() {
-        return new ExoRenderersFactory(null, null, null, null, 0);
+        return new ExoRenderersFactory(null, null, null, null);
     }
 
-    static RenderersFactory buildRenderersFactory(AudioProcessor audioProcessor, TextOutput secondaryTextOutput, LibassPlaybackSession libassPlaybackSession, DecoderManager decoderManager, int motionFps) {
-        return new ExoRenderersFactory(audioProcessor, secondaryTextOutput, libassPlaybackSession, decoderManager, motionFps);
+    static RenderersFactory buildRenderersFactory(AudioProcessor audioProcessor, TextOutput secondaryTextOutput, LibassPlaybackSession libassPlaybackSession, DecoderManager decoderManager) {
+        return new ExoRenderersFactory(audioProcessor, secondaryTextOutput, libassPlaybackSession, decoderManager);
     }
 
     private static AudioSink buildAudioSink(Context context, boolean enableFloatOutput, boolean enableAudioOutputPlaybackParams, @Nullable AudioProcessor audioProcessor) {
@@ -97,16 +97,13 @@ public final class ExoUtil {
         return builder.build();
     }
 
-    // Upstream's FfmpegMotionRenderersFactory is not present in the prebuilt
-    // media3 AARs available for this fork, so keep the standard renderer factory.
-    // motionFps is accepted for API compatibility but has no effect here.
     private static final class ExoRenderersFactory extends DefaultRenderersFactory {
 
         @Nullable private final AudioProcessor audioProcessor;
         @Nullable private final TextOutput secondaryTextOutput;
         @Nullable private final LibassPlaybackSession libassPlaybackSession;
 
-        private ExoRenderersFactory(@Nullable AudioProcessor audioProcessor, @Nullable TextOutput secondaryTextOutput, @Nullable LibassPlaybackSession libassPlaybackSession, @Nullable DecoderManager decoderManager, int motionFps) {
+        private ExoRenderersFactory(@Nullable AudioProcessor audioProcessor, @Nullable TextOutput secondaryTextOutput, @Nullable LibassPlaybackSession libassPlaybackSession, @Nullable DecoderManager decoderManager) {
             super(App.get());
             this.audioProcessor = audioProcessor;
             this.secondaryTextOutput = secondaryTextOutput;

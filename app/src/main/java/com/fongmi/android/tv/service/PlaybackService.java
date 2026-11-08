@@ -294,17 +294,10 @@ public class PlaybackService extends MediaLibraryService implements MediaLibrary
     }
 
     @Override
-    public void onRebind(Intent intent) {
-        if (isBrowserBind(intent)) clients.bind();
-        super.onRebind(intent);
-    }
-
-    @Override
     public boolean onUnbind(Intent intent) {
         if (isBrowserBind(intent)) releaseBrowser();
         if (isLocalBind(intent)) tryShutdown();
-        boolean rebind = super.onUnbind(intent);
-        return isBrowserBind(intent) || rebind;
+        return super.onUnbind(intent);
     }
 
     @Override
