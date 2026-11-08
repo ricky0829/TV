@@ -43,8 +43,12 @@ jobs:
             exit 0
           fi
           BEFORE=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
+          FORK_SHA=$(git rev-parse HEAD)
           echo "up_to_date=false" >> "$GITHUB_OUTPUT"
-          if git merge --no-edit upstream/fongmi; then
+          # -X ours resolves content conflicts on the fork side automatically.
+          # Upstream's native mpv interpolation needs media3 AARs that are not
+          # published for this fork, so that file group is restored below.
+          if git merge -X ours --no-edit upstream/fongmi; then
             echo "conflict=false" >> "$GITHUB_OUTPUT"
             AFTER=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
             if [ "$BEFORE" != "$AFTER" ]; then
@@ -56,7 +60,36 @@ jobs:
             git diff --name-only --diff-filter=U | sort > /tmp/conflicts.txt
             git merge --abort
             echo "conflict=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          PROTECTED="
+          app/src/leanback/java/com/fongmi/android/tv/ui/activity/SettingPlayerActivity.java
+          app/src/leanback/java/com/fongmi/android/tv/ui/dialog/VideoSettingPanel.java
+          app/src/leanback/res/layout/activity_setting_player.xml
+          app/src/main/java/com/fongmi/android/tv/player/exo/ExoUtil.java
+          app/src/main/java/com/fongmi/android/tv/player/exo/ExoPlayerSession.java
+          app/src/main/java/com/fongmi/android/tv/player/mpv/MpvUtil.java
+          app/src/main/java/com/fongmi/android/tv/player/mpv/MpvMotionSupport.java
+          app/src/main/java/com/fongmi/android/tv/setting/PlayerSetting.java
+          app/src/main/java/com/fongmi/android/tv/ui/dialog/MpvMotionSettingPanel.java
+          app/src/main/res/values/strings.xml
+          app/src/main/res/values-zh-rCN/strings.xml
+          app/src/main/res/values-zh-rTW/strings.xml
+          app/src/main/res/layout/view_mpv_motion.xml
+          app/src/mobile/java/com/fongmi/android/tv/ui/fragment/SettingPlayerFragment.java
+          app/src/mobile/res/layout/fragment_setting_player.xml
+          app/proguard-rules.pro
+          "
+          for f in $PROTECTED; do
+            if git cat-file -e "$FORK_SHA:$f" 2>/dev/null; then
+              git checkout "$FORK_SHA" -- "$f"
+            else
+              git rm -f -- "$f" 2>/dev/null || true
+            fi
+          done
+          git add -A
+          git commit --amend --no-edit
+          echo "::notice::插帧相关文件已恢复为 fork 版本（上游原生插帧依赖未公开的 media3 AAR）"
 
       - name: Warn about AAR refresh
         if: steps.merge.outputs.versions_changed == 'true'
