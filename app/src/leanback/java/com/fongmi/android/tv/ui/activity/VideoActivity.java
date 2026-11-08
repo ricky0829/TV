@@ -310,6 +310,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     protected void initEvent() {
         mBinding.keep.setOnClickListener(view -> onKeep());
         mBinding.video.setOnClickListener(view -> onVideo());
+        mBinding.endingCancel.setOnClickListener(view -> mVod.cancelEndingSkip());
         mBinding.change.setOnClickListener(view -> onChange());
         mBinding.content.setOnClickListener(view -> onContent());
         mBinding.control.action.text.setOnClickListener(this::onTrack);
@@ -571,6 +572,26 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     public boolean isPlaybackEndingManaged() {
         return !isWebPlaybackActive() && isPlaybackCurrent() && player().isEndingManaged();
+    }
+
+    @Override
+    public boolean supportsEndingCountdown() {
+        return true;
+    }
+
+    @Override
+    public void showEndingCountdown(int seconds) {
+        mBinding.endingText.setText(getString(R.string.play_ending_countdown, seconds));
+        if (mBinding.endingTip.getVisibility() == View.VISIBLE) return;
+        mBinding.endingTip.setVisibility(View.VISIBLE);
+        mBinding.endingCancel.requestFocus();
+    }
+
+    @Override
+    public void hideEndingCountdown() {
+        if (mBinding.endingTip.getVisibility() == View.GONE) return;
+        mBinding.endingTip.setVisibility(View.GONE);
+        if (mBinding.endingCancel.hasFocus()) mBinding.video.requestFocus();
     }
 
     @Override
@@ -1586,6 +1607,16 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
+        if (isVisible(mBinding.endingTip) && KeyUtil.isActionDown(event)) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                mVod.cancelEndingSkip();
+                return true;
+            }
+            if (mBinding.endingCancel.hasFocus() && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                mVod.cancelEndingSkip();
+                return true;
+            }
+        }
         if (keyCode == KeyEvent.KEYCODE_MENU && KeyUtil.isActionDown(event)) mInput.cancelSeek();
         boolean discMenuShortcut = keyCode == KeyEvent.KEYCODE_MEDIA_TOP_MENU || keyCode == KeyEvent.KEYCODE_TV_CONTENTS_MENU;
         boolean discMenuNavigation = keyCode != KeyEvent.KEYCODE_MENU && isFullscreen() && isGone(mBinding.control.getRoot());

@@ -22,5 +22,6 @@
 
     <!-- Playback -->
     <string name="detail_episode">Episodes</string>
+    <string name="play_ending_countdown">Next episode in %1$d s</string>
 
 </resources>

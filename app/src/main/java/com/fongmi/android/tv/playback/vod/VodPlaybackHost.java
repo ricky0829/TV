@@ -77,6 +77,17 @@ public interface VodPlaybackHost {
         return false;
     }
 
+    /** Only hosts that render a cancelable outro countdown opt in. */
+    default boolean supportsEndingCountdown() {
+        return false;
+    }
+
+    default void showEndingCountdown(int seconds) {
+    }
+
+    default void hideEndingCountdown() {
+    }
+
     void startPlayback(Result result, boolean useParse, long startPositionMs, MediaMetadata metadata);
 
     boolean preloadPlayback(Result result, long startPositionMs, MediaMetadata metadata, VodPlayRequest request);

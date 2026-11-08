@@ -52,6 +52,19 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
      （只有文件自然播完才跳）。公开镜像 fork 的同一 AAR 哈希相同，无真实实现可用。
    - 若将来换成真正裁剪 Timeline 的 AAR，该判据会自动让引擎重新托管片尾。
    - `sync-upstream.yml` 的 `Verify custom patches` 已加对应 grep 校验。
+7. 片尾跳集倒计时提示与取消（上游没有的功能）
+   - `VodPlaybackHost`：`supportsEndingCountdown()`（默认 false，mobile 保持立即跳）、
+     `showEndingCountdown(int)` / `hideEndingCountdown()` 三个 default 方法。
+   - `VodPlaybackController.handleEndingSkip()`：进入片尾区间后启动 8 秒倒计时
+     （**按播放位置推进**，暂停时冻结；且不超过剩余播放时长），每秒刷新文案，
+     到点才 `skipToEnd()`；
+     `cancelEndingSkip()` 置 `endingCancelled` 并在本集内不再跳；
+     `clearSkipState()` 在换集 / reset / 改片尾值时重置。
+   - `activity_video.xml` 的 `@id/endingTip`（`endingText` + `endingCancel`，默认 gone，
+     取消按钮 nextFocus 自环）；`VideoActivity` 实现三个 host 方法、按钮点击与
+     `dispatchKeyEvent` 中 BACK / OK 取消；`showEndingCountdown` 首次显示时把焦点给取消按钮。
+   - 三组 leanback `strings.xml` 的 `play_ending_countdown`；取消按钮复用 main 的
+     `module_cancel`。README 首页功能清单第 5 项必须保留。
 
 ## 同步步骤
 

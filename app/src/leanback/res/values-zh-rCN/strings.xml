@@ -22,5 +22,6 @@
 
     <!-- Playback -->
     <string name="detail_episode">选集</string>
+    <string name="play_ending_countdown">%1$d 秒后将跳转下一集</string>
 
 </resources>

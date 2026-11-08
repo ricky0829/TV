@@ -28,6 +28,7 @@ public class VodPlaybackController {
 
     private static final String PUSH_PREFIX = "push://";
     private static final String SEARCH_PREFIX = "msearch:";
+    private static final long ENDING_COUNTDOWN_MS = 8000;
 
     private final VodPlaybackHost host;
     private final VodDataSource dataSource;
@@ -38,6 +39,9 @@ public class VodPlaybackController {
     private History lastHistory;
     private SkipSegment activeSkip;
     private boolean manualEndingTriggered;
+    private long endingTargetPosition;
+    private boolean endingCancelled;
+    private int endingLastSeconds = -1;
 
     public VodPlaybackController(VodPlaybackHost host, VodDataSource dataSource, VodPlaybackState state) {
         this.host = host;
@@ -58,6 +62,10 @@ public class VodPlaybackController {
     private void clearSkipState() {
         activeSkip = null;
         manualEndingTriggered = false;
+        endingTargetPosition = 0;
+        endingCancelled = false;
+        endingLastSeconds = -1;
+        host.hideEndingCountdown();
     }
 
     public void checkId() {
@@ -486,11 +494,57 @@ public class VodPlaybackController {
         host.setPlaybackEnding(history == null ? 0 : history.getEnding());
         historyPolicy.updateProgress(history, time, position, duration);
         if (history != null && duration > 0 && history.getEnding() > 0 && history.getEnding() + position >= duration) {
-            skipEnding(history, duration, request);
+            handleEndingSkip(history, position, duration, request);
             return;
         }
         manualEndingTriggered = false;
+        if (endingTargetPosition > 0) {
+            endingTargetPosition = 0;
+            host.hideEndingCountdown();
+        }
         skipSegment(history, position, duration, request);
+    }
+
+    /**
+     * Outro handling with a cancelable countdown. Hosts without the prompt
+     * (e.g. mobile) keep the original immediate jump. The countdown is driven
+     * by playback position rather than wall time, so pausing freezes it, and
+     * it is capped by the remaining duration so the file never ends first.
+     */
+    private void handleEndingSkip(History history, long position, long duration, VodPlayRequest request) {
+        if (endingCancelled || manualEndingTriggered) return;
+        if (host.isPlaybackEndingManaged()) return;
+        if (!host.supportsEndingCountdown()) {
+            skipEnding(history, duration, request);
+            return;
+        }
+        if (endingTargetPosition <= 0) {
+            long remaining = duration - position - 1000;
+            if (remaining < 1000) {
+                skipEnding(history, duration, request);
+                return;
+            }
+            endingTargetPosition = position + Math.min(ENDING_COUNTDOWN_MS, remaining);
+            endingLastSeconds = -1;
+        }
+        if (position >= endingTargetPosition) {
+            host.hideEndingCountdown();
+            endingTargetPosition = 0;
+            boolean triggered = skipToEnd(history, duration);
+            if (state.getPlayingRequest() == request) manualEndingTriggered = triggered;
+            return;
+        }
+        int seconds = (int) Math.max(1, Math.ceil((endingTargetPosition - position) / 1000.0));
+        if (seconds == endingLastSeconds) return;
+        endingLastSeconds = seconds;
+        host.showEndingCountdown(seconds);
+    }
+
+    /** Called by the host when the user cancels the pending next-episode jump. */
+    public void cancelEndingSkip() {
+        endingCancelled = true;
+        endingTargetPosition = 0;
+        host.hideEndingCountdown();
     }
 
     private void skipEnding(History history, long duration, VodPlayRequest request) {
