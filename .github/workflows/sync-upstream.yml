@@ -59,7 +59,8 @@ jobs:
           app/src/main/res/values-zh-rCN/strings.xml
           app/src/main/res/values-zh-rTW/strings.xml
           app/src/main/res/layout/view_mpv_motion.xml
-          app/src/main/res/layout/dialog_video_setting.xml
+          app/src/leanback/res/layout/dialog_video_setting.xml
+          app/src/mobile/res/layout/dialog_video_setting.xml
           app/src/mobile/java/com/fongmi/android/tv/ui/fragment/SettingPlayerFragment.java
           app/src/mobile/res/layout/fragment_setting_player.xml
           app/proguard-rules.pro
