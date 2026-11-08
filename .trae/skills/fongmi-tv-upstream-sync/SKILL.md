@@ -131,6 +131,16 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
   资产清单；**不要写签名信息**（签名细节放在本文件的「签名」章节，不进发布说明）。
 - 上游升级时 `sync-upstream.yml` 的 `Sync version metadata` 会自动读取上游
   `versionName` / `versionCode` 并更新上述两处，**不要手工补号**。
+- **无代码变更不发布新版**（用户明确要求）：`build-tv.yml` 的 `push.paths` 只列
+  真正影响 APK 的路径：`app/**`、`build.gradle`、`settings.gradle`、
+  `gradle/libs.versions.toml`、`buildSrc/**`。改 `.github/workflows/**`、
+  `.trae/skills/**`、`README.md`、`gradle.properties`（版本基准）、其他文档都**不触发构建**；
+  `workflow_dispatch` 保留，确实需要时手动发版。
+- `sync-upstream.yml` 的 `Trigger build` 用
+  `git diff --name-only "$FORK_SHA" HEAD` 判断合并净变化是否含上述代码路径，
+  只有含才 `gh workflow run build-tv.yml`。`Merge upstream` 输出 `fork_sha`。
+  注意：用 `GITHUB_TOKEN` 推送不会触发 push 事件，这条显式 dispatch **仍必须保留**。
+- 极端情况：上游升版但完全没有 `app/**` 变化时不会自动发版，需手动 dispatch 一次。
 
 ## 验证
 

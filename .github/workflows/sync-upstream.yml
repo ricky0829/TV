@@ -44,6 +44,7 @@ jobs:
           fi
           BEFORE=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
           FORK_SHA=$(git rev-parse HEAD)
+          echo "fork_sha=$FORK_SHA" >> "$GITHUB_OUTPUT"
           echo "up_to_date=false" >> "$GITHUB_OUTPUT"
           PROTECTED="
           app/src/leanback/java/com/fongmi/android/tv/ui/activity/SettingPlayerActivity.java
@@ -165,6 +166,8 @@ jobs:
           check .github/workflows/build-tv.yml 'gh release create' '新 Release 发布'
           check .github/workflows/build-tv.yml '本次变动' 'Release 变动说明'
           check .github/workflows/build-tv.yml '近期功能变更' 'Release 累计功能变更'
+          check .github/workflows/build-tv.yml 'Only paths that actually change the APK' '仅代码变更触发构建'
+          check .github/workflows/sync-upstream.yml '本次同步仅涉及文档' '无代码变更不发版'
           if grep -rqE 'FfmpegMotionRenderersFactory|androidx\.media3\.decoder\.ffmpeg' app/src; then
             echo "::error::上游插帧实现依赖的新 AAR 类泄漏到受保护文件之外，请更新 PROTECTED 清单；已中止推送与发布"
             exit 1
@@ -236,4 +239,14 @@ jobs:
         if: steps.merge.outputs.conflict == 'false' && steps.merge.outputs.up_to_date == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run build-tv.yml --ref fongmi
+          FORK_SHA: ${{ steps.merge.outputs.fork_sha }}
+        run: |
+          # A push made with GITHUB_TOKEN does not fire push events, so this
+          # explicit dispatch is still required. But only dispatch when the
+          # merge actually changed APK-producing sources.
+          if git diff --name-only "$FORK_SHA" HEAD | grep -qE '^(app/|build\.gradle$|settings\.gradle$|gradle/libs\.versions\.toml$|buildSrc/)'; then
+            gh workflow run build-tv.yml --ref fongmi
+            echo "::notice::本次同步包含代码变更，已触发构建"
+          else
+            echo "::notice::本次同步仅涉及文档 / CI / 版本规则，按约定不发布新版"
+          fi

@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [fongmi]
+    # Only paths that actually change the APK. Workflow, doc and release-rule
+    # edits must NOT create a new version; use workflow_dispatch if a manual
+    # release is ever needed.
     paths:
       - "app/**"
-      - ".github/workflows/build-tv.yml"
       - "build.gradle"
       - "settings.gradle"
-      - "gradle.properties"
-      - "gradle/**"
+      - "gradle/libs.versions.toml"
       - "buildSrc/**"
 
 permissions:
