@@ -11,9 +11,9 @@ import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.audio.AudioProcessor;
-import androidx.media3.decoder.ffmpeg.FfmpegMotionRenderersFactory;
 import androidx.media3.exoplayer.DecoderManager;
 import androidx.media3.exoplayer.DefaultLoadControl;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.LoadControl;
 import androidx.media3.exoplayer.Renderer;
@@ -97,14 +97,17 @@ public final class ExoUtil {
         return builder.build();
     }
 
-    private static final class ExoRenderersFactory extends FfmpegMotionRenderersFactory {
+    // Upstream's FfmpegMotionRenderersFactory is not present in the prebuilt
+    // media3 AARs available for this fork, so keep the standard renderer factory.
+    // motionFps is accepted for API compatibility but has no effect here.
+    private static final class ExoRenderersFactory extends DefaultRenderersFactory {
 
         @Nullable private final AudioProcessor audioProcessor;
         @Nullable private final TextOutput secondaryTextOutput;
         @Nullable private final LibassPlaybackSession libassPlaybackSession;
 
         private ExoRenderersFactory(@Nullable AudioProcessor audioProcessor, @Nullable TextOutput secondaryTextOutput, @Nullable LibassPlaybackSession libassPlaybackSession, @Nullable DecoderManager decoderManager, int motionFps) {
-            super(App.get(), motionFps == 0 ? 60 : motionFps, 480, motionFps != 0);
+            super(App.get());
             this.audioProcessor = audioProcessor;
             this.secondaryTextOutput = secondaryTextOutput;
             this.libassPlaybackSession = libassPlaybackSession;
