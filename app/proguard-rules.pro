@@ -1,12 +1,6 @@
 # TV
 -keep class androidx.leanback.widget.** { *; }
 
-# mpv motion interpolation uses reflection to reach the playback properties
--keepclassmembers class androidx.media3.mpvplayer.MpvPlayer {
-  private androidx.media3.mpvplayer.nativebridge.MpvPlaybackProperties playbackProperties;
-}
--keep class androidx.media3.mpvplayer.nativebridge.MpvPlaybackProperties { public *; }
-
 -keep class com.fongmi.android.tv.bean.** { *; }
 
 -keep class com.fongmi.android.tv.ui.activity.WebActivity {

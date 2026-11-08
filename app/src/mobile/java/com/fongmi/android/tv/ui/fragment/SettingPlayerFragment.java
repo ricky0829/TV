@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.ui.fragment;
 
 import android.content.DialogInterface;
+import android.os.Build;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,6 +22,7 @@ import com.fongmi.android.tv.ui.base.BaseFragment;
 import com.fongmi.android.tv.ui.dialog.BufferDialog;
 import com.fongmi.android.tv.ui.dialog.MpvConfDialog;
 import com.fongmi.android.tv.ui.dialog.UaDialog;
+import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -61,6 +63,7 @@ public class SettingPlayerFragment extends BaseFragment implements UaListener, B
         mBinding.mpvGpuNext.setOnClickListener(this::setMpvGpuNext);
         mBinding.mpvVulkan.setOnClickListener(this::setMpvVulkan);
         mBinding.mpvMotion.setOnClickListener(this::setMpvMotion);
+        mBinding.exoMotion.setOnClickListener(this::setExoMotion);
         mBinding.render.setOnClickListener(this::setRender);
         mBinding.background.setOnClickListener(this::onBackground);
         mBinding.buffer.setOnClickListener(this::onBuffer);
@@ -70,6 +73,9 @@ public class SettingPlayerFragment extends BaseFragment implements UaListener, B
 
     private void setVisible() {
         boolean exo = PlayerSetting.isExo();
+        boolean exoMotion = exo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+        mBinding.exoMotion.setVisibility(exoMotion ? View.VISIBLE : View.GONE);
+        setExoMotionText();
         boolean vulkan = !exo && MpvUtil.isVulkanSupported();
         mBinding.mpvConf.setVisibility(exo ? View.GONE : View.VISIBLE);
         mBinding.mpvVulkan.setVisibility(vulkan ? View.VISIBLE : View.GONE);
@@ -99,6 +105,22 @@ public class SettingPlayerFragment extends BaseFragment implements UaListener, B
     private void setMpvVulkan(View view) {
         PlayerSetting.putMpvVulkan(!PlayerSetting.isMpvVulkan());
         setMpvOptions();
+    }
+
+    private void setExoMotion(View view) {
+        String[] items = ResUtil.getStringArray(R.array.select_mpv_motion);
+        new MaterialAlertDialogBuilder(requireActivity()).setTitle(R.string.player_mpv_motion).setNegativeButton(R.string.dialog_negative, null).setSingleChoiceItems(items, PlayerSetting.getExoMotion(), this::onExoMotion).show();
+    }
+
+    private void onExoMotion(DialogInterface dialog, int which) {
+        PlayerSetting.putExoMotion(which);
+        setExoMotionText();
+        Notify.show(R.string.player_motion_restart);
+        dialog.dismiss();
+    }
+
+    private void setExoMotionText() {
+        mBinding.exoMotionText.setText(ResUtil.getStringArray(R.array.select_mpv_motion)[PlayerSetting.getExoMotion()]);
     }
 
     private void setMpvMotion(View view) {

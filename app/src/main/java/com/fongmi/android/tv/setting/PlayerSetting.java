@@ -91,6 +91,22 @@ public class PlayerSetting {
         };
     }
 
+    public static int getExoMotion() {
+        return Math.clamp(Prefers.getInt("exo_motion"), 0, 2);
+    }
+
+    public static void putExoMotion(int motion) {
+        Prefers.put("exo_motion", Math.clamp(motion, 0, 2));
+    }
+
+    public static int getExoMotionFps() {
+        return switch (getExoMotion()) {
+            case 1 -> 60;
+            case 2 -> 120;
+            default -> 0;
+        };
+    }
+
     public static int getRender() {
         return Math.clamp(Prefers.getInt("render", RENDER_SURFACE), RENDER_SURFACE, RENDER_TEXTURE);
     }
