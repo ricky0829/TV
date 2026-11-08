@@ -41,6 +41,17 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
    - `MpvUtil.addMotionOptions`（初始化时写入 mpv 选项，`MOTION_OPTIONS` 同步维护）
    - `MpvMotionSettingPanel.java`（面板状态与即时切换）
    - `app/proguard-rules.pro` 的 keep 规则（release 混淆后反射仍有效）
+6. 片尾自动跳集（AAR 空壳兜底）
+   - `app/src/main/java/com/fongmi/android/tv/player/exo/ExoPlayerEngine.java` 的
+     `isEndingManaged()` 必须同时判断 `endingSource.isEndTrimActive()` 与
+     `endingSource.getOriginalDurationMs() != C.TIME_UNSET`。
+   - 原因：Release `aar` 的 `lib-exoplayer-release.aar` 中 `EndTrimMediaSource` 是
+     占位实现——`prepareSource` / `createPeriod` 全部原样转发，不裁剪 Timeline，
+     `getOriginalDurationMs()` 恒返回 `C.TIME_UNSET`。只看 `isEndTrimActive()` 会把
+     `VodPlaybackController.skipEnding()` 的 Java 兜底短路，导致片尾时间点不跳下一集
+     （只有文件自然播完才跳）。公开镜像 fork 的同一 AAR 哈希相同，无真实实现可用。
+   - 若将来换成真正裁剪 Timeline 的 AAR，该判据会自动让引擎重新托管片尾。
+   - `sync-upstream.yml` 的 `Verify custom patches` 已加对应 grep 校验。
 
 ## 同步步骤
 

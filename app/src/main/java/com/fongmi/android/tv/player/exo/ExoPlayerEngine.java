@@ -218,7 +218,18 @@ public class ExoPlayerEngine implements PlayerEngine, AnalyticsListener {
 
     @Override
     public boolean isEndingManaged() {
-        return endingSource != null && endingSource.isEndTrimActive();
+        // The prebuilt media3 AAR ships a placeholder EndTrimMediaSource: it
+        // reports isEndTrimActive() as soon as a trim value is set, but forwards
+        // every MediaSource call unchanged and always returns C.TIME_UNSET from
+        // getOriginalDurationMs(). Claiming engine-side management here would
+        // short-circuit VodPlaybackController.skipEnding(), so the configured
+        // outro never starts the next episode until the file ends naturally.
+        // Only report management when real trimming is in effect (the source
+        // exposes an original, untrimmed duration), otherwise let the Java-side
+        // fallback handle the outro.
+        return endingSource != null
+                && endingSource.isEndTrimActive()
+                && endingSource.getOriginalDurationMs() != C.TIME_UNSET;
     }
 
     @Override
