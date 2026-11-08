@@ -96,10 +96,13 @@ jobs:
             | sort -n)
           LAST=$(echo "$NUMS" | tail -1)
           RECENT=$(echo "$NUMS" | tail -3 | head -1)
-          NEXT=$(( ${LAST:-0} + 1 ))
-          VERSION="${BASE}-${NEXT}"
-          if [ -n "$LAST" ]; then PREV="${BASE}-${LAST}"; else PREV=""; fi
-          if [ -n "$RECENT" ]; then RECENT_BASE="${BASE}-${RECENT}"; else RECENT_BASE=""; fi
+          # Tags are zero-padded (01..09). Force base 10: bash treats 08/09 as
+          # invalid octal inside arithmetic expansion. Keep the padding so the
+          # lexicographic order GitHub uses matches the numeric order.
+          NEXT=$(( 10#${LAST:-0} + 1 ))
+          VERSION=$(printf "%s-%02d" "$BASE" "$NEXT")
+          if [ -n "$LAST" ]; then PREV=$(printf "%s-%02d" "$BASE" "$((10#$LAST))"); else PREV=""; fi
+          if [ -n "$RECENT" ]; then RECENT_BASE=$(printf "%s-%02d" "$BASE" "$((10#$RECENT))"); else RECENT_BASE=""; fi
           echo "TV_VERSION_NAME=${VERSION}" >> "$GITHUB_ENV"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "prev=${PREV}" >> "$GITHUB_OUTPUT"

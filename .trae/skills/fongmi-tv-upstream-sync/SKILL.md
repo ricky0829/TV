@@ -100,8 +100,13 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 
 ## 版本与发布
 
-- 版本号规则：`<上游版本>-<自然数>`，序号从 1 起，**每成功构建一次递增 1**，
-  例 `5.8.7-1`、`5.8.7-2`、`5.8.7-3`……；上游升级后序号自动从 1 重算。
+- 版本号规则：`<上游版本>-<两位自然数>`，序号从 `01` 起，**每成功构建一次递增 1**，
+  例 `5.8.7-01`、`5.8.7-02`、`5.8.7-03`……`5.8.7-11`；上游升级后序号自动从 `01` 重算。
+  **必须补零到两位**：GitHub 的 Release 列表按 tag 名排序，不补零时 `5.8.7-9`
+  会排在 `5.8.7-11` 前面（`'9' > '1'`），最新Release 反而夹在中间。历史 `-1`…`-9`
+  已重命名为 `-01`…`-09`，旧单数字 tag 与下载链接不再有效。
+  `Compute version` 用 `printf "%s-%02d"` 生成版本号，并用 `10#` 强制十进制解析
+  （否则 bash 把 `08` / `09` 当非法八进制）；两位格式可正确排序到 `-99`。
 - 单一来源：`gradle.properties` 的 `tvBaseVersion`；`app/build.gradle` 的
   `versionName` 优先取 CI 注入的 `TV_VERSION_NAME`，本地构建回落到 `tvBaseVersion`。
   `versionCode` 跟随上游（当前 587），由同步工作流自动维护，保证同签名可直接覆盖安装。
@@ -110,14 +115,14 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
   **新 tag 与新 Release**（tag 指向当次 commit），附两个 ABI 的 APK。
 - 仓库**不维护 `leanback-latest` 之类的滚动别名**：那种做法会让 tag / target_commitish /
   published_at 一直停在首次创建的 commit，页面看起来没有更新，也无法回溯版本。
-  已发布的历史版本不覆盖，下载链接一律写具体版本号 `releases/download/5.8.7-N/...`。
+  已发布的历史版本不覆盖，下载链接一律写具体版本号 `releases/download/5.8.7-NN/...`。
 - Release 说明必须包含**本次变动内容**：`Publish release` 用 `gh api
   repos/$GITHUB_REPOSITORY/compare/$PREV...$GITHUB_SHA` 取相对上一个版本 tag 的
   提交列表（最多 20 条，格式 `- 提交标题 (短 SHA)`），并附
   `https://github.com/$GITHUB_REPOSITORY/compare/$PREV...$GITHUB_SHA` 差异链接作为兜底；
   首个版本没有 PREV，改为附 commit 链接。`Compute version` 同时输出 `prev`。
 - **逐版差集不够用**：跨版本升级时只看最新 Release 会漏掉前一两版的功能修复
-  （例：片尾修复在 `5.8.7-7`，`5.8.7-8` 只有 CI 提交，页面上看不到该修复）。
+  （例：片尾修复在 `5.8.7-07`，`5.8.7-08` 只有 CI 提交，页面上看不到该修复）。
   因此 `Compute version` 还输出 `recent_base`（倒数第 3 个已发布版本 tag），
   `Publish release` 额外生成「近期功能变更」累计视图：取
   `compare/$RECENT_BASE...$GITHUB_SHA` 的提交，过滤 `ci/build/chore/docs/merge/revert/test`
@@ -129,7 +134,7 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 
 ## 验证
 
-- `Build Leanback APK` 为绿，出现新的 `5.8.7-N` Release：tag 指向当次 commit，
+- `Build Leanback APK` 为绿，出现新的 `5.8.7-NN` Release：tag 指向当次 commit，
   两个 APK 资产齐全，说明里的构建时间为北京时间。
 - 安装后检查：标题下分辨率、控制栏选集按钮、详情页多排选集、搜索页左侧竖排站点、mpv 播放设置中的运动补偿。
 - 运动补偿前提：设备支持 Vulkan 1.2；面板显示的目标帧率不高于实际刷新率。
