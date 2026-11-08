@@ -52,19 +52,24 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
      （只有文件自然播完才跳）。公开镜像 fork 的同一 AAR 哈希相同，无真实实现可用。
    - 若将来换成真正裁剪 Timeline 的 AAR，该判据会自动让引擎重新托管片尾。
    - `sync-upstream.yml` 的 `Verify custom patches` 已加对应 grep 校验。
-7. 片尾跳集倒计时提示与取消（上游没有的功能）
-   - `VodPlaybackHost`：`supportsEndingCountdown()`（默认 false，mobile 保持立即跳）、
-     `showEndingCountdown(int)` / `hideEndingCountdown()` 三个 default 方法。
-   - `VodPlaybackController.handleEndingSkip()`：进入片尾区间后启动 8 秒倒计时
-     （**按播放位置推进**，暂停时冻结；且不超过剩余播放时长），每秒刷新文案，
-     到点才 `skipToEnd()`；
-     `cancelEndingSkip()` 置 `endingCancelled` 并在本集内不再跳；
-     `clearSkipState()` 在换集 / reset / 改片尾值时重置。
-   - `activity_video.xml` 的 `@id/endingTip`（`endingText` + `endingCancel`，默认 gone，
-     取消按钮 nextFocus 自环）；`VideoActivity` 实现三个 host 方法、按钮点击与
-     `dispatchKeyEvent` 中 BACK / OK 取消；`showEndingCountdown` 首次显示时把焦点给取消按钮。
-   - 三组 leanback `strings.xml` 的 `play_ending_countdown`；取消按钮复用 main 的
-     `module_cancel`。README 首页功能清单第 5 项必须保留。
+7. 片头/片尾跳转的可操作提示（上游没有的功能）
+   - `VodPlaybackHost`：`supportsPlaybackHints()`（默认 false，mobile 保持立即跳）、
+     `showOpeningHint()` / `showEndingHint(int)` / `hidePlaybackHint()`。
+   - `VodPlaybackController`：用 **wall-clock**（`hintDeadline`）统一超时 8 秒；
+     不要「暂停时冻结倒计时」——用户明确删除了按播放位置推进的实现。
+     `startPlayback()` 用 `VodSkipPolicy.startPositionMs(history, result, C.TIME_UNSET)`
+     判断是否跳过片头，是则 `openOpeningHint()`；`handleEndingSkip()` 进入片尾区间后
+     启动倒计时，`finishEndingSkip()` 到点跳集。
+   - `onHintAction(int)` 六个动作：片头「取消跳过」seek 0、「倒退/前进 10 秒」可重复按
+     且每次重置超时；片尾「立刻跳转」「10 秒后跳转」（deadline 顺延 10 秒）「取消跳转」
+     （`cancelEndingSkip()`）。`dismissHint()` 由 BACK 调用，隐藏提示但片尾倒计时仍继续、
+     到点照常跳集；`clearSkipState()` 在换集 / reset 时重置全部状态。
+   - `activity_video.xml` 的 `@id/hintBar`（`hintText` + `hintAction1/2/3`，默认 gone，
+     三按钮 nextFocus 左右环绕、上下自环）；`VideoActivity.showHint()` 按类型设置文案、
+     标签（`setTag` 存 action）与默认焦点（片头第 1 个、片尾第 3 个「取消跳转」）；
+     `dispatchKeyEvent` 在提示可见时把方向键 / OK 交给系统做焦点与点击，BACK 关提示。
+   - 三组 leanback `strings.xml` 的 `play_ending_countdown` 与 `hint_*` 七个字符串。
+     README 首页功能清单第 5 项必须保留。
 
 ## 同步步骤
 

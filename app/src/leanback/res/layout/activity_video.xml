@@ -49,44 +49,83 @@
             android:layout_height="match_parent" />
 
         <LinearLayout
-            android:id="@+id/endingTip"
+            android:id="@+id/hintBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|center_horizontal"
             android:layout_marginTop="12dp"
             android:background="#CC000000"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
             android:paddingStart="16dp"
             android:paddingTop="8dp"
-            android:paddingEnd="12dp"
+            android:paddingEnd="16dp"
             android:paddingBottom="8dp"
             android:visibility="gone"
             tools:visibility="visible">
 
             <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/endingText"
+                android:id="@+id/hintText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp"
                 android:textColor="@color/white"
                 android:textSize="14sp"
                 tools:text="8 秒后将跳转下一集" />
 
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/endingCancel"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/selector_chip"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:nextFocusLeft="@id/endingCancel"
-                android:nextFocusRight="@id/endingCancel"
-                android:nextFocusUp="@id/endingCancel"
-                android:nextFocusDown="@id/endingCancel"
-                android:text="@string/module_cancel"
-                android:textColor="@color/white"
-                android:textSize="14sp" />
+                android:orientation="horizontal">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/hintAction1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/selector_chip"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/hintAction3"
+                    android:nextFocusRight="@id/hintAction2"
+                    android:nextFocusUp="@id/hintAction1"
+                    android:nextFocusDown="@id/hintAction1"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    tools:text="立刻跳转" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/hintAction2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/selector_chip"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/hintAction1"
+                    android:nextFocusRight="@id/hintAction3"
+                    android:nextFocusUp="@id/hintAction2"
+                    android:nextFocusDown="@id/hintAction2"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    tools:text="10 秒后跳转" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/hintAction3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/selector_chip"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/hintAction2"
+                    android:nextFocusRight="@id/hintAction1"
+                    android:nextFocusUp="@id/hintAction3"
+                    android:nextFocusDown="@id/hintAction3"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    tools:text="取消跳转" />
+
+            </LinearLayout>
 
         </LinearLayout>
 

@@ -23,5 +23,12 @@
     <!-- Playback -->
     <string name="detail_episode">Episodes</string>
     <string name="play_ending_countdown">Next episode in %1$d s</string>
+    <string name="hint_opening_text">Intro skipped, adjust position</string>
+    <string name="hint_opening_cancel">Undo skip</string>
+    <string name="hint_opening_back">-10 s</string>
+    <string name="hint_opening_forward">+10 s</string>
+    <string name="hint_ending_now">Skip now</string>
+    <string name="hint_ending_delay">In 10 s</string>
+    <string name="hint_ending_cancel">Cancel</string>
 
 </resources>

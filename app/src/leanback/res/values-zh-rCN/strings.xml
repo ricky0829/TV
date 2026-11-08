@@ -23,5 +23,12 @@
     <!-- Playback -->
     <string name="detail_episode">选集</string>
     <string name="play_ending_countdown">%1$d 秒后将跳转下一集</string>
+    <string name="hint_opening_text">已跳过片头，可调整位置</string>
+    <string name="hint_opening_cancel">取消跳过</string>
+    <string name="hint_opening_back">倒退 10 秒</string>
+    <string name="hint_opening_forward">前进 10 秒</string>
+    <string name="hint_ending_now">立刻跳转</string>
+    <string name="hint_ending_delay">10 秒后跳转</string>
+    <string name="hint_ending_cancel">取消跳转</string>
 
 </resources>

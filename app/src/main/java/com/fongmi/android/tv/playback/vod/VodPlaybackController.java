@@ -28,7 +28,20 @@ public class VodPlaybackController {
 
     private static final String PUSH_PREFIX = "push://";
     private static final String SEARCH_PREFIX = "msearch:";
-    private static final long ENDING_COUNTDOWN_MS = 8000;
+    private static final long HINT_TIMEOUT_MS = 8000;
+    private static final long HINT_DELAY_MS = 10000;
+    private static final long HINT_SEEK_MS = 10000;
+
+    public static final int HINT_OPENING_CANCEL = 0;
+    public static final int HINT_OPENING_BACK = 1;
+    public static final int HINT_OPENING_FORWARD = 2;
+    public static final int HINT_ENDING_NOW = 3;
+    public static final int HINT_ENDING_DELAY = 4;
+    public static final int HINT_ENDING_CANCEL = 5;
+
+    private static final int HINT_NONE = 0;
+    private static final int HINT_OPENING = 1;
+    private static final int HINT_ENDING = 2;
 
     private final VodPlaybackHost host;
     private final VodDataSource dataSource;
@@ -39,9 +52,14 @@ public class VodPlaybackController {
     private History lastHistory;
     private SkipSegment activeSkip;
     private boolean manualEndingTriggered;
-    private long endingTargetPosition;
+    private int hintKind;
+    private long hintDeadline;
+    private boolean hintDismissed;
     private boolean endingCancelled;
     private int endingLastSeconds = -1;
+    private History endingHistory;
+    private long endingDuration;
+    private VodPlayRequest endingRequest;
 
     public VodPlaybackController(VodPlaybackHost host, VodDataSource dataSource, VodPlaybackState state) {
         this.host = host;
@@ -62,10 +80,13 @@ public class VodPlaybackController {
     private void clearSkipState() {
         activeSkip = null;
         manualEndingTriggered = false;
-        endingTargetPosition = 0;
+        hintKind = HINT_NONE;
+        hintDeadline = 0;
+        hintDismissed = false;
         endingCancelled = false;
         endingLastSeconds = -1;
-        host.hideEndingCountdown();
+        endingRequest = null;
+        host.hidePlaybackHint();
     }
 
     public void checkId() {
@@ -249,6 +270,23 @@ public class VodPlaybackController {
         MediaMetadata metadata = publishPlaybackMetadata(episode);
         host.setPlaybackEnding(state.getHistory() == null ? 0 : state.getHistory().getEnding());
         host.startPlayback(result, state.isUseParse(), startPositionMs, metadata);
+        if (host.supportsPlaybackHints() && wasOpeningSkipped(result, startPositionMs)) openOpeningHint();
+    }
+
+    /**
+     * True only when the start position was chosen by an intro skip. Comparing
+     * against the resume position is unreliable here: applyPlaybackState()
+     * already wrote history.position before this method runs.
+     */
+    private boolean wasOpeningSkipped(Result result, long startPositionMs) {
+        if (startPositionMs <= 0) return false;
+        History history = state.getHistory();
+        if (history != null && history.getOpening() > 0 && startPositionMs == history.getOpening()) return true;
+        for (SkipSegment segment : result.getSkipSegments()) {
+            if (segment == null || !segment.isOpening() || !segment.isValid() || segment.getStart() != 0) continue;
+            if (startPositionMs == segment.getEnd()) return true;
+        }
+        return false;
     }
 
     public void onSearchResult(Result result) {
@@ -493,58 +531,122 @@ public class VodPlaybackController {
         History history = currentHistory();
         host.setPlaybackEnding(history == null ? 0 : history.getEnding());
         historyPolicy.updateProgress(history, time, position, duration);
-        if (history != null && duration > 0 && history.getEnding() > 0 && history.getEnding() + position >= duration) {
-            handleEndingSkip(history, position, duration, request);
+        boolean inOutro = history != null && duration > 0 && history.getEnding() > 0 && history.getEnding() + position >= duration;
+        if (inOutro) {
+            handleEndingSkip(time, history, duration, request);
             return;
         }
         manualEndingTriggered = false;
-        if (endingTargetPosition > 0) {
-            endingTargetPosition = 0;
-            host.hideEndingCountdown();
-        }
+        if (hintKind == HINT_ENDING || hintDismissed) closeHint();
+        if (hintKind == HINT_OPENING && time >= hintDeadline) closeHint();
         skipSegment(history, position, duration, request);
     }
 
     /**
-     * Outro handling with a cancelable countdown. Hosts without the prompt
-     * (e.g. mobile) keep the original immediate jump. The countdown is driven
-     * by playback position rather than wall time, so pausing freezes it, and
-     * it is capped by the remaining duration so the file never ends first.
+     * Outro handling with a wall-clock countdown and an actionable prompt.
+     * Hosts without hints (e.g. mobile) keep the original immediate jump.
      */
-    private void handleEndingSkip(History history, long position, long duration, VodPlayRequest request) {
+    private void handleEndingSkip(long time, History history, long duration, VodPlayRequest request) {
         if (endingCancelled || manualEndingTriggered) return;
         if (host.isPlaybackEndingManaged()) return;
-        if (!host.supportsEndingCountdown()) {
+        if (!host.supportsPlaybackHints()) {
             skipEnding(history, duration, request);
             return;
         }
-        if (endingTargetPosition <= 0) {
-            long remaining = duration - position - 1000;
+        if (hintKind == HINT_OPENING) closeHint();
+        endingHistory = history;
+        endingDuration = duration;
+        endingRequest = request;
+        if (hintDeadline <= 0) {
+            long remaining = duration - host.getPlayerPosition() - 1000;
             if (remaining < 1000) {
                 skipEnding(history, duration, request);
                 return;
             }
-            endingTargetPosition = position + Math.min(ENDING_COUNTDOWN_MS, remaining);
+            hintDeadline = time + Math.min(HINT_TIMEOUT_MS, remaining);
             endingLastSeconds = -1;
         }
-        if (position >= endingTargetPosition) {
-            host.hideEndingCountdown();
-            endingTargetPosition = 0;
-            boolean triggered = skipToEnd(history, duration);
-            if (state.getPlayingRequest() == request) manualEndingTriggered = triggered;
-            return;
+        int seconds = (int) Math.max(1, Math.ceil((hintDeadline - time) / 1000.0));
+        if (!hintDismissed && hintKind != HINT_ENDING) hintKind = HINT_ENDING;
+        if (!hintDismissed && seconds != endingLastSeconds) {
+            endingLastSeconds = seconds;
+            host.showEndingHint(seconds);
         }
-        int seconds = (int) Math.max(1, Math.ceil((endingTargetPosition - position) / 1000.0));
-        if (seconds == endingLastSeconds) return;
-        endingLastSeconds = seconds;
-        host.showEndingCountdown(seconds);
+        if (time >= hintDeadline) finishEndingSkip();
+    }
+
+    private void openOpeningHint() {
+        hintKind = HINT_OPENING;
+        hintDeadline = System.currentTimeMillis() + HINT_TIMEOUT_MS;
+        hintDismissed = false;
+        endingLastSeconds = -1;
+        host.showOpeningHint();
+    }
+
+    private void closeHint() {
+        hintKind = HINT_NONE;
+        hintDeadline = 0;
+        hintDismissed = false;
+        endingLastSeconds = -1;
+        endingRequest = null;
+        host.hidePlaybackHint();
+    }
+
+    private void finishEndingSkip() {
+        History history = endingHistory;
+        long duration = endingDuration;
+        VodPlayRequest request = endingRequest;
+        closeHint();
+        boolean triggered = skipToEnd(history, duration);
+        if (request != null && state.getPlayingRequest() == request) manualEndingTriggered = triggered;
+    }
+
+    /** Button actions from the hint bar. Seek actions can be repeated. */
+    public void onHintAction(int action) {
+        switch (action) {
+            case HINT_OPENING_CANCEL:
+                host.seekPlayback(0);
+                closeHint();
+                break;
+            case HINT_OPENING_BACK:
+            case HINT_OPENING_FORWARD: {
+                long current = host.getPlayerPosition();
+                if (current < 0) break;
+                long target = current + (action == HINT_OPENING_BACK ? -HINT_SEEK_MS : HINT_SEEK_MS);
+                long duration = host.getPlayerDuration();
+                if (duration > 0) target = Math.min(target, duration);
+                host.seekPlayback(Math.max(0, target));
+                hintDeadline = System.currentTimeMillis() + HINT_TIMEOUT_MS;
+                break;
+            }
+            case HINT_ENDING_NOW:
+                finishEndingSkip();
+                break;
+            case HINT_ENDING_DELAY:
+                hintDeadline = System.currentTimeMillis() + HINT_DELAY_MS;
+                endingLastSeconds = -1;
+                if (hintKind == HINT_ENDING && !hintDismissed) host.showEndingHint((int) (HINT_DELAY_MS / 1000));
+                break;
+            case HINT_ENDING_CANCEL:
+                cancelEndingSkip();
+                break;
+            default:
+                break;
+        }
+    }
+
+    /** BACK hides the prompt; a pending outro jump still fires on timeout. */
+    public void dismissHint() {
+        hintKind = HINT_NONE;
+        hintDismissed = true;
+        endingLastSeconds = -1;
+        host.hidePlaybackHint();
     }
 
     /** Called by the host when the user cancels the pending next-episode jump. */
     public void cancelEndingSkip() {
         endingCancelled = true;
-        endingTargetPosition = 0;
-        host.hideEndingCountdown();
+        closeHint();
     }
 
     private void skipEnding(History history, long duration, VodPlayRequest request) {

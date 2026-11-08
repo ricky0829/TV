@@ -310,7 +310,9 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     protected void initEvent() {
         mBinding.keep.setOnClickListener(view -> onKeep());
         mBinding.video.setOnClickListener(view -> onVideo());
-        mBinding.endingCancel.setOnClickListener(view -> mVod.cancelEndingSkip());
+        mBinding.hintAction1.setOnClickListener(this::onHintAction);
+        mBinding.hintAction2.setOnClickListener(this::onHintAction);
+        mBinding.hintAction3.setOnClickListener(this::onHintAction);
         mBinding.change.setOnClickListener(view -> onChange());
         mBinding.content.setOnClickListener(view -> onContent());
         mBinding.control.action.text.setOnClickListener(this::onTrack);
@@ -575,23 +577,49 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     }
 
     @Override
-    public boolean supportsEndingCountdown() {
+    public boolean supportsPlaybackHints() {
         return true;
     }
 
-    @Override
-    public void showEndingCountdown(int seconds) {
-        mBinding.endingText.setText(getString(R.string.play_ending_countdown, seconds));
-        if (mBinding.endingTip.getVisibility() == View.VISIBLE) return;
-        mBinding.endingTip.setVisibility(View.VISIBLE);
-        mBinding.endingCancel.requestFocus();
+    private void onHintAction(View view) {
+        Object tag = view.getTag();
+        if (tag instanceof Integer) mVod.onHintAction((Integer) tag);
     }
 
     @Override
-    public void hideEndingCountdown() {
-        if (mBinding.endingTip.getVisibility() == View.GONE) return;
-        mBinding.endingTip.setVisibility(View.GONE);
-        if (mBinding.endingCancel.hasFocus()) mBinding.video.requestFocus();
+    public void showOpeningHint() {
+        showHint(getString(R.string.hint_opening_text),
+                R.string.hint_opening_cancel, R.string.hint_opening_back, R.string.hint_opening_forward,
+                VodPlaybackController.HINT_OPENING_CANCEL, VodPlaybackController.HINT_OPENING_BACK, VodPlaybackController.HINT_OPENING_FORWARD,
+                mBinding.hintAction1);
+    }
+
+    @Override
+    public void showEndingHint(int seconds) {
+        showHint(getString(R.string.play_ending_countdown, seconds),
+                R.string.hint_ending_now, R.string.hint_ending_delay, R.string.hint_ending_cancel,
+                VodPlaybackController.HINT_ENDING_NOW, VodPlaybackController.HINT_ENDING_DELAY, VodPlaybackController.HINT_ENDING_CANCEL,
+                mBinding.hintAction3);
+    }
+
+    private void showHint(String text, int label1, int label2, int label3, int action1, int action2, int action3, View focus) {
+        mBinding.hintText.setText(text);
+        mBinding.hintAction1.setText(label1);
+        mBinding.hintAction2.setText(label2);
+        mBinding.hintAction3.setText(label3);
+        mBinding.hintAction1.setTag(action1);
+        mBinding.hintAction2.setTag(action2);
+        mBinding.hintAction3.setTag(action3);
+        if (mBinding.hintBar.getVisibility() == View.VISIBLE) return;
+        mBinding.hintBar.setVisibility(View.VISIBLE);
+        focus.requestFocus();
+    }
+
+    @Override
+    public void hidePlaybackHint() {
+        if (mBinding.hintBar.getVisibility() == View.GONE) return;
+        mBinding.hintBar.setVisibility(View.GONE);
+        if (mBinding.hintAction1.hasFocus() || mBinding.hintAction2.hasFocus() || mBinding.hintAction3.hasFocus()) mBinding.video.requestFocus();
     }
 
     @Override
@@ -1607,14 +1635,15 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
-        if (isVisible(mBinding.endingTip) && KeyUtil.isActionDown(event)) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                mVod.cancelEndingSkip();
+        if (isVisible(mBinding.hintBar)) {
+            if (keyCode == KeyEvent.KEYCODE_BACK && KeyUtil.isActionDown(event)) {
+                mVod.dismissHint();
                 return true;
             }
-            if (mBinding.endingCancel.hasFocus() && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
-                mVod.cancelEndingSkip();
-                return true;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                    || keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                return super.dispatchKeyEvent(event);
             }
         }
         if (keyCode == KeyEvent.KEYCODE_MENU && KeyUtil.isActionDown(event)) mInput.cancelSeek();

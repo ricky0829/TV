@@ -77,15 +77,18 @@ public interface VodPlaybackHost {
         return false;
     }
 
-    /** Only hosts that render a cancelable outro countdown opt in. */
-    default boolean supportsEndingCountdown() {
+    /** Only hosts that render the fork's playback hints opt in. */
+    default boolean supportsPlaybackHints() {
         return false;
     }
 
-    default void showEndingCountdown(int seconds) {
+    default void showOpeningHint() {
     }
 
-    default void hideEndingCountdown() {
+    default void showEndingHint(int seconds) {
+    }
+
+    default void hidePlaybackHint() {
     }
 
     void startPlayback(Result result, boolean useParse, long startPositionMs, MediaMetadata metadata);
