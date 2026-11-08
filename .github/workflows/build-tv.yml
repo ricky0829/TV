@@ -96,8 +96,10 @@ jobs:
             | sort -n | tail -1)
           NEXT=$(( ${LAST:-0} + 1 ))
           VERSION="${BASE}-${NEXT}"
+          if [ -n "$LAST" ]; then PREV="${BASE}-${LAST}"; else PREV=""; fi
           echo "TV_VERSION_NAME=${VERSION}" >> "$GITHUB_ENV"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "prev=${PREV}" >> "$GITHUB_OUTPUT"
           echo "Base ${BASE}, last tag ${LAST:-none}, building ${VERSION}"
 
       - name: Build leanback release
@@ -117,10 +119,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          PREV="${{ steps.version.outputs.prev }}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           BUILT_AT="$(date -u -d '+8 hours' '+%Y-%m-%d %H:%M') 北京时间 (UTC+8)"
           APK_DIR=app/build/outputs/apk/leanback/release
+
+          # Collect the commits shipped since the previous versioned release.
+          # Always publish a compare link as a reliable fallback.
+          CHANGE_LINES=""
+          if [ -n "$PREV" ]; then
+            CHANGE_TITLE="**本次变动**（相对 ${PREV}）"
+            DIFF_LINE="完整差异：https://github.com/${GITHUB_REPOSITORY}/compare/${PREV}...${GITHUB_SHA}"
+            if gh api "repos/${GITHUB_REPOSITORY}/compare/${PREV}...${GITHUB_SHA}" > /tmp/compare.json 2>/dev/null; then
+              CHANGE_LINES=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); cs=d.get("commits",[]); lines=["- %s (%s)" % (c["commit"]["message"].splitlines()[0].strip(), c["sha"][:7]) for c in cs[:20]]; lines += ["- … 其余 %d 条见差异链接" % (len(cs)-20)] if len(cs)>20 else []; print(chr(10).join(lines) or "- （无新增提交）")' /tmp/compare.json)
+            fi
+          else
+            CHANGE_TITLE="**本次变动**（首个版本）"
+            DIFF_LINE="提交详情：https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+          fi
+          if [ -z "$CHANGE_LINES" ]; then CHANGE_LINES="- （提交列表获取失败，请查看下方差异链接）"; fi
+
           NOTES="Automated leanback build $VERSION from the fongmi branch.
+
+          $CHANGE_TITLE
+          $CHANGE_LINES
+
+          $DIFF_LINE
 
           Commit: $GITHUB_SHA ($SHORT_SHA)
           Built: $BUILT_AT

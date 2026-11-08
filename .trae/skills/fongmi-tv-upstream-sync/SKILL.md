@@ -89,7 +89,12 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
 - 仓库**不维护 `leanback-latest` 之类的滚动别名**：那种做法会让 tag / target_commitish /
   published_at 一直停在首次创建的 commit，页面看起来没有更新，也无法回溯版本。
   已发布的历史版本不覆盖，下载链接一律写具体版本号 `releases/download/5.8.7-N/...`。
-- Release 说明只写 commit、构建时间（**北京时间 UTC+8**）、versionName/versionCode、
+- Release 说明必须包含**本次变动内容**：`Publish release` 用 `gh api
+  repos/$GITHUB_REPOSITORY/compare/$PREV...$GITHUB_SHA` 取相对上一个版本 tag 的
+  提交列表（最多 20 条，格式 `- 提交标题 (短 SHA)`），并附
+  `https://github.com/$GITHUB_REPOSITORY/compare/$PREV...$GITHUB_SHA` 差异链接作为兜底；
+  首个版本没有 PREV，改为附 commit 链接。`Compute version` 同时输出 `prev`。
+- 其余说明字段：commit、构建时间（**北京时间 UTC+8**）、versionName/versionCode、
   资产清单；**不要写签名信息**（签名细节放在本文件的「签名」章节，不进发布说明）。
 - 上游升级时 `sync-upstream.yml` 的 `Sync version metadata` 会自动读取上游
   `versionName` / `versionCode` 并更新上述两处，**不要手工补号**。

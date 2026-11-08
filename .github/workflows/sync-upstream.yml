@@ -157,6 +157,7 @@ jobs:
           check gradle.properties 'tvBaseVersion' '版本基准'
           check .github/workflows/build-tv.yml 'Compute version' '版本化构建'
           check .github/workflows/build-tv.yml 'gh release create' '新 Release 发布'
+          check .github/workflows/build-tv.yml '本次变动' 'Release 变动说明'
           if grep -rqE 'FfmpegMotionRenderersFactory|androidx\.media3\.decoder\.ffmpeg' app/src; then
             echo "::error::上游插帧实现依赖的新 AAR 类泄漏到受保护文件之外，请更新 PROTECTED 清单；已中止推送与发布"
             exit 1
