@@ -55,6 +55,7 @@ public class VodPlaybackController {
     private int hintKind;
     private long hintDeadline;
     private boolean hintDismissed;
+    private boolean openingHintPending;
     private boolean endingCancelled;
     private int endingLastSeconds = -1;
     private History endingHistory;
@@ -83,6 +84,7 @@ public class VodPlaybackController {
         hintKind = HINT_NONE;
         hintDeadline = 0;
         hintDismissed = false;
+        openingHintPending = false;
         endingCancelled = false;
         endingLastSeconds = -1;
         endingRequest = null;
@@ -270,7 +272,9 @@ public class VodPlaybackController {
         MediaMetadata metadata = publishPlaybackMetadata(episode);
         host.setPlaybackEnding(state.getHistory() == null ? 0 : state.getHistory().getEnding());
         host.startPlayback(result, state.isUseParse(), startPositionMs, metadata);
-        if (host.supportsPlaybackHints() && wasOpeningSkipped(result, startPositionMs)) openOpeningHint();
+        // Only arm the hint here; show it once playback actually starts so a
+        // slow-loading source cannot eat the 8-second timeout.
+        openingHintPending = host.supportsPlaybackHints() && wasOpeningSkipped(result, startPositionMs);
     }
 
     /**
@@ -528,6 +532,10 @@ public class VodPlaybackController {
         VodPlayRequest request = state.getPlayingRequest();
         if (request == null) return;
         preloader.onTimeChanged();
+        if (openingHintPending && duration > 0 && host.isPlayerPlaying()) {
+            openingHintPending = false;
+            openOpeningHint();
+        }
         History history = currentHistory();
         host.setPlaybackEnding(history == null ? 0 : history.getEnding());
         historyPolicy.updateProgress(history, time, position, duration);
@@ -576,6 +584,7 @@ public class VodPlaybackController {
     }
 
     private void openOpeningHint() {
+        openingHintPending = false;
         hintKind = HINT_OPENING;
         hintDeadline = System.currentTimeMillis() + HINT_TIMEOUT_MS;
         hintDismissed = false;

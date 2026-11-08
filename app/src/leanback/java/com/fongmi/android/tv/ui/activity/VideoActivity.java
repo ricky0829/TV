@@ -599,7 +599,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         showHint(getString(R.string.play_ending_countdown, seconds),
                 R.string.hint_ending_now, R.string.hint_ending_delay, R.string.hint_ending_cancel,
                 VodPlaybackController.HINT_ENDING_NOW, VodPlaybackController.HINT_ENDING_DELAY, VodPlaybackController.HINT_ENDING_CANCEL,
-                mBinding.hintAction3);
+                mBinding.hintAction1);
     }
 
     private void showHint(String text, int label1, int label2, int label3, int action1, int action2, int action3, View focus) {
@@ -612,7 +612,11 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         mBinding.hintAction3.setTag(action3);
         if (mBinding.hintBar.getVisibility() == View.VISIBLE) return;
         mBinding.hintBar.setVisibility(View.VISIBLE);
-        focus.requestFocus();
+        // A synchronous requestFocus right after setVisibility can lose to the
+        // framework's default focus (the first focusable child). Defer it.
+        mBinding.hintBar.post(() -> {
+            if (mBinding.hintBar.getVisibility() == View.VISIBLE) focus.requestFocus();
+        });
     }
 
     @Override
