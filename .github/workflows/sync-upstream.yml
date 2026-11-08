@@ -122,7 +122,7 @@ jobs:
               echo "请按 .trae/skills/fongmi-tv-upstream-sync/SKILL.md 的清单逐项恢复后重新同步。"
             } > /tmp/issue.md
             cat /tmp/issue.md >> "$GITHUB_STEP_SUMMARY"
-            if gh issue create --title "上游同步后自定义改动缺失" --body-file /tmp/issue.md; then
+            if gh issue create --repo "$GITHUB_REPOSITORY" --title "上游同步后自定义改动缺失" --body-file /tmp/issue.md; then
               echo "::notice::缺失项已创建 issue"
             else
               echo "::warning::创建 issue 失败（token 权限不足），详情已写入 Job Summary"
@@ -159,7 +159,10 @@ jobs:
             echo "处理要点见 [.trae/skills/fongmi-tv-upstream-sync/SKILL.md](https://github.com/${GITHUB_REPOSITORY}/blob/fongmi/.trae/skills/fongmi-tv-upstream-sync/SKILL.md)：分辨率/选集/多排选集/竖排站点改动、运动补偿兼容层、预编译 AAR 版本。"
           } > /tmp/issue.md
           cat /tmp/issue.md >> "$GITHUB_STEP_SUMMARY"
-          if gh issue create --title "上游同步冲突：需要手动合并 FongMi/TV" --body-file /tmp/issue.md; then
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+          echo -n "gh default repo: "
+          gh repo view --json nameWithOwner --jq .nameWithOwner || true
+          if gh issue create --repo "$GITHUB_REPOSITORY" --title "上游同步冲突：需要手动合并 FongMi/TV" --body-file /tmp/issue.md; then
             echo "::notice::冲突详情已创建 issue"
           else
             echo "::warning::创建 issue 失败（token 权限不足），冲突详情已写入 Job Summary"
