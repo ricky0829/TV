@@ -45,26 +45,8 @@ jobs:
           BEFORE=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
           FORK_SHA=$(git rev-parse HEAD)
           echo "up_to_date=false" >> "$GITHUB_OUTPUT"
-          # -X ours resolves content conflicts on the fork side automatically.
-          # Upstream's native mpv interpolation needs media3 AARs that are not
-          # published for this fork, so that file group is restored below.
-          if git merge -X ours --no-edit upstream/fongmi; then
-            echo "conflict=false" >> "$GITHUB_OUTPUT"
-            AFTER=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
-            if [ "$BEFORE" != "$AFTER" ]; then
-              echo "versions_changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "versions_changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            git diff --name-only --diff-filter=U | sort > /tmp/conflicts.txt
-            git merge --abort
-            echo "conflict=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           PROTECTED="
           app/src/leanback/java/com/fongmi/android/tv/ui/activity/SettingPlayerActivity.java
-          app/src/leanback/java/com/fongmi/android/tv/ui/dialog/VideoSettingPanel.java
           app/src/leanback/res/layout/activity_setting_player.xml
           app/src/main/java/com/fongmi/android/tv/player/exo/ExoUtil.java
           app/src/main/java/com/fongmi/android/tv/player/exo/ExoPlayerSession.java
@@ -72,14 +54,43 @@ jobs:
           app/src/main/java/com/fongmi/android/tv/player/mpv/MpvMotionSupport.java
           app/src/main/java/com/fongmi/android/tv/setting/PlayerSetting.java
           app/src/main/java/com/fongmi/android/tv/ui/dialog/MpvMotionSettingPanel.java
+          app/src/main/java/com/fongmi/android/tv/ui/dialog/VideoSettingPanel.java
           app/src/main/res/values/strings.xml
           app/src/main/res/values-zh-rCN/strings.xml
           app/src/main/res/values-zh-rTW/strings.xml
           app/src/main/res/layout/view_mpv_motion.xml
+          app/src/main/res/layout/dialog_video_setting.xml
           app/src/mobile/java/com/fongmi/android/tv/ui/fragment/SettingPlayerFragment.java
           app/src/mobile/res/layout/fragment_setting_player.xml
           app/proguard-rules.pro
           "
+          # -X ours resolves content conflicts on the fork side automatically.
+          # Upstream's native mpv interpolation needs media3 AARs that are not
+          # published for this fork, so that file group is restored below.
+          if git merge -X ours --no-edit upstream/fongmi; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+          else
+            # Any remaining structural conflict (add/add, modify/delete) is also
+            # resolved on the fork side so a merge never stops the sync run.
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+            for f in $CONFLICT_FILES; do
+              git checkout --ours -- "$f" 2>/dev/null || git rm -f -- "$f" 2>/dev/null || true
+              git add -- "$f" 2>/dev/null || true
+            done
+            if ! git commit --no-edit; then
+              git merge --abort
+              echo "conflict=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::以下冲突已按 fork 侧自动解决：$CONFLICT_FILES"
+          fi
+          AFTER=$(git rev-parse "HEAD:gradle/libs.versions.toml" 2>/dev/null || true)
+          if [ "$BEFORE" != "$AFTER" ]; then
+            echo "versions_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "versions_changed=false" >> "$GITHUB_OUTPUT"
+          fi
           for f in $PROTECTED; do
             if git cat-file -e "$FORK_SHA:$f" 2>/dev/null; then
               git checkout "$FORK_SHA" -- "$f"
@@ -144,6 +155,10 @@ jobs:
           check gradle.properties 'tvBaseVersion' '版本基准'
           check .github/workflows/build-tv.yml 'Compute version' '版本化构建'
           check .github/workflows/build-tv.yml 'gh release create' '新 Release 发布'
+          if grep -rqE 'FfmpegMotionRenderersFactory|androidx\.media3\.decoder\.ffmpeg' app/src; then
+            echo "::error::上游插帧实现依赖的新 AAR 类泄漏到受保护文件之外，请更新 PROTECTED 清单；已中止推送与发布"
+            exit 1
+          fi
           if [ -s /tmp/missing.txt ]; then
             {
               echo "上游合并后检测到自定义改动缺失，已中止推送与发布。"
