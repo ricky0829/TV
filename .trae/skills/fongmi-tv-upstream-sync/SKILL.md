@@ -94,6 +94,12 @@ description: 把 FongMi/TV 上游更新同步到 ricky0829/TV 的 fongmi 分支�
   提交列表（最多 20 条，格式 `- 提交标题 (短 SHA)`），并附
   `https://github.com/$GITHUB_REPOSITORY/compare/$PREV...$GITHUB_SHA` 差异链接作为兜底；
   首个版本没有 PREV，改为附 commit 链接。`Compute version` 同时输出 `prev`。
+- **逐版差集不够用**：跨版本升级时只看最新 Release 会漏掉前一两版的功能修复
+  （例：片尾修复在 `5.8.7-7`，`5.8.7-8` 只有 CI 提交，页面上看不到该修复）。
+  因此 `Compute version` 还输出 `recent_base`（倒数第 3 个已发布版本 tag），
+  `Publish release` 额外生成「近期功能变更」累计视图：取
+  `compare/$RECENT_BASE...$GITHUB_SHA` 的提交，过滤 `ci/build/chore/docs/merge/revert/test`
+  前缀，最多 15 条，并附累计差异链接。两段内容都要保留。
 - 其余说明字段：commit、构建时间（**北京时间 UTC+8**）、versionName/versionCode、
   资产清单；**不要写签名信息**（签名细节放在本文件的「签名」章节，不进发布说明）。
 - 上游升级时 `sync-upstream.yml` 的 `Sync version metadata` 会自动读取上游

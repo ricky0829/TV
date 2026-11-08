@@ -91,16 +91,20 @@ jobs:
         run: |
           BASE=$(sed -n 's/^tvBaseVersion=//p' gradle.properties | head -1)
           BASE_RE=$(echo "$BASE" | sed 's/\./\\./g')
-          LAST=$(git ls-remote --tags origin "refs/tags/${BASE}-*" \
+          NUMS=$(git ls-remote --tags origin "refs/tags/${BASE}-*" \
             | sed -n "s#.*refs/tags/${BASE_RE}-\([0-9][0-9]*\)\$#\1#p" \
-            | sort -n | tail -1)
+            | sort -n)
+          LAST=$(echo "$NUMS" | tail -1)
+          RECENT=$(echo "$NUMS" | tail -3 | head -1)
           NEXT=$(( ${LAST:-0} + 1 ))
           VERSION="${BASE}-${NEXT}"
           if [ -n "$LAST" ]; then PREV="${BASE}-${LAST}"; else PREV=""; fi
+          if [ -n "$RECENT" ]; then RECENT_BASE="${BASE}-${RECENT}"; else RECENT_BASE=""; fi
           echo "TV_VERSION_NAME=${VERSION}" >> "$GITHUB_ENV"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "prev=${PREV}" >> "$GITHUB_OUTPUT"
-          echo "Base ${BASE}, last tag ${LAST:-none}, building ${VERSION}"
+          echo "recent_base=${RECENT_BASE}" >> "$GITHUB_OUTPUT"
+          echo "Base ${BASE}, last tag ${LAST:-none}, recent base ${RECENT_BASE:-none}, building ${VERSION}"
 
       - name: Build leanback release
         run: |
@@ -139,12 +143,34 @@ jobs:
           fi
           if [ -z "$CHANGE_LINES" ]; then CHANGE_LINES="- （提交列表获取失败，请查看下方差异链接）"; fi
 
+          # A per-tag diff is exact but useless when someone upgrades across
+          # several versions: the newest release then shows only CI commits and
+          # hides the functional fixes shipped one or two releases earlier.
+          # Add a cumulative view over the last three published versions,
+          # filtering out CI/merge/revert noise so real fixes stay visible.
+          RECENT_BASE="${{ steps.version.outputs.recent_base }}"
+          RECENT_SECTION=""
+          if [ -n "$RECENT_BASE" ]; then
+            RECENT_URL="https://github.com/${GITHUB_REPOSITORY}/compare/${RECENT_BASE}...${GITHUB_SHA}"
+            RECENT_LINES=""
+            if gh api "repos/${GITHUB_REPOSITORY}/compare/${RECENT_BASE}...${GITHUB_SHA}" > /tmp/recent.json 2>/dev/null; then
+              RECENT_LINES=$(python3 -c 'import json,sys,re; d=json.load(open(sys.argv[1])); skip=re.compile(r"^(ci|build|chore|docs|merge|revert|test)[(: ]",re.I); all_lines=["- %s (%s)" % (c["commit"]["message"].splitlines()[0].strip(), c["sha"][:7]) for c in d.get("commits",[]) if not skip.match(c["commit"]["message"].splitlines()[0].strip())]; lines=all_lines[:15]; lines += ["- … 其余 %d 条见累计差异链接" % (len(all_lines)-15)] if len(all_lines)>15 else []; print(chr(10).join(lines) or "- （近期无功能类提交）")' /tmp/recent.json)
+            fi
+            if [ -z "$RECENT_LINES" ]; then RECENT_LINES="- （提交列表获取失败，请查看下方累计差异链接）"; fi
+            RECENT_SECTION="**近期功能变更**（自 ${RECENT_BASE} 起，含本版；已过滤 CI / 构建 / 合并类提交）
+          $RECENT_LINES
+
+          累计差异：$RECENT_URL"
+          fi
+
           NOTES="Automated leanback build $VERSION from the fongmi branch.
 
           $CHANGE_TITLE
           $CHANGE_LINES
 
           $DIFF_LINE
+
+          $RECENT_SECTION
 
           Commit: $GITHUB_SHA ($SHORT_SHA)
           Built: $BUILT_AT
